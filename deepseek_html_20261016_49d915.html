@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gölge Ağı v2</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;font-family:system-ui,sans-serif;background:#000;color:#e6edf7;user-select:none}
+  button{font-family:inherit;cursor:pointer;border:none;outline:none;background:none;color:inherit}
+
+  #matrix{position:absolute;inset:0;z-index:1;opacity:.7}
+  .app{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;
+    background:rgba(0,0,0,.55);overflow:hidden}
+  .app::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:100;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.12) 0px,rgba(0,0,0,.12) 1px,transparent 1px,transparent 3px)}
+
+  .head{display:flex;justify-content:space-between;align-items:center;
+    padding:10px 18px;border-bottom:1px solid rgba(51,255,102,.35);
+    background:rgba(0,0,0,.4);flex-wrap:wrap;gap:10px;flex-shrink:0;z-index:10;position:relative}
+  .head-left{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .head-tag{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;
+    font-size:11px;letter-spacing:2px;color:#33ff66;font-weight:700}
+  .head-tag svg{width:14px;height:14px;flex-shrink:0}
+  .rec-dot{width:8px;height:8px;border-radius:50%;background:#ff3355;
+    box-shadow:0 0 8px #ff3355;animation:recblink 1.2s infinite}
+  @keyframes recblink{50%{opacity:.3}}
+
+  .stat-group{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .stat{display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px}
+  .stat svg{width:14px;height:14px}
+  .stat .lbl{color:#6b8fad;font-size:10px}
+  .stat .val{color:#33ff66;font-weight:700}
+  .stat.warn .val{color:#ffcc33}
+  .stat.danger .val{color:#ff3355}
+
+  .head-btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .hbtn{display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid rgba(51,255,102,.4);
+    border-radius:6px;font-size:11px;letter-spacing:1.5px;color:#33ff66;font-weight:600;
+    font-family:'JetBrains Mono',monospace;transition:.15s;position:relative}
+  .hbtn svg{width:14px;height:14px;flex-shrink:0}
+  .hbtn:hover{background:rgba(51,255,102,.12);border-color:#33ff66}
+  .hbtn.alert{border-color:#ff3355;color:#ff3355;background:rgba(255,51,85,.08);
+    animation:alertpulse 1.4s infinite}
+  .hbtn.active{border-color:#ffff66;color:#ffff66;background:rgba(255,255,102,.1)}
+  .hbtn .badge{position:absolute;top:-6px;right:-6px;background:#ff3355;color:#fff;
+    font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;padding:0 4px}
+  @keyframes alertpulse{50%{background:rgba(255,51,85,.25)}}
+
+  .timer-ring{display:none;align-items:center;gap:8px;padding:4px 10px;
+    border:1px solid rgba(255,255,102,.4);border-radius:8px;background:rgba(255,255,102,.06)}
+  .timer-ring.on{display:flex}
+  .timer-ring svg{transform:rotate(-90deg)}
+  .timer-ring .tval{font-family:'JetBrains Mono',monospace;font-size:13px;
+    color:#ffff66;font-weight:700;min-width:42px}
+  .timer-ring.warn{border-color:#ffcc33}
+  .timer-ring.warn .tval{color:#ffcc33}
+  .timer-ring.danger{border-color:#ff3355;animation:alertpulse 0.8s infinite}
+  .timer-ring.danger .tval{color:#ff3355}
+  .timer-ring .ring-bg{stroke:rgba(255,255,102,.15)}
+  .timer-ring .ring-fg{stroke:#ffff66;stroke-linecap:round;transition:stroke-dashoffset .5s linear}
+  .timer-ring.warn .ring-fg{stroke:#ffcc33}
+  .timer-ring.danger .ring-fg{stroke:#ff3355}
+
+  .main{flex:1;display:flex;overflow:hidden;position:relative;z-index:5;min-height:0}
+  .term{flex:1;display:flex;flex-direction:column;padding:14px 18px;min-width:0;
+    font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:13px;
+    line-height:1.6;color:#33ff66;text-shadow:0 0 5px rgba(51,255,102,.35)}
+
+  #hackLog{flex:1;overflow-y:auto;padding-right:8px;min-height:0}
+  #hackLog::-webkit-scrollbar{width:6px}
+  #hackLog::-webkit-scrollbar-thumb{background:rgba(51,255,102,.4);border-radius:3px}
+  #hackLog .l{margin-bottom:1px;white-space:pre-wrap;word-break:break-word}
+  .warn{color:#ffcc33}.err{color:#ff3355}.info{color:#33ccff}.sys{color:#888}
+  .ok{color:#33ff66;font-weight:700}.hl{color:#ffff66;font-weight:700}
+  .dir{color:#33aaff;font-weight:700}.prompt{color:#33ff66;font-weight:700}
+  #hackLog .mission-box{border-left:3px solid #33ff66;padding:8px 12px;margin:10px 0;
+    background:linear-gradient(90deg,rgba(51,255,102,.08),transparent);
+    border-radius:0 8px 8px 0;display:block}
+  #hackLog .mission-box .mh{color:#ffff66;font-weight:700;display:flex;align-items:center;gap:6px}
+  #hackLog .mission-box .mr{color:#33ccff;font-size:12px;margin-top:2px}
+  #hackLog .brief{border:1px solid rgba(255,204,51,.4);background:rgba(255,204,51,.05);
+    padding:12px 16px;margin:12px 0;border-radius:8px;display:block;line-height:1.7}
+  #hackLog .brief b{color:#ffff66}
+  #hackLog .step-row{display:flex;gap:8px;padding:3px 0;align-items:baseline}
+  #hackLog .step-row .n{color:#6b8fad;min-width:22px}
+  #hackLog .step-row .c{color:#33ccff;font-weight:700}
+  #hackLog .step-row .d{color:#8fa3c0;font-size:11.5px}
+  #hackLog .step-row.done .c{color:#33ff66;text-decoration:line-through;opacity:.5}
+  #hackLog .step-row.now .c{color:#ffff66;text-shadow:0 0 8px #ffff66}
+  #hackLog .step-row.now .n{color:#ffff66}
+
+  .input-row{display:flex;align-items:center;gap:8px;border-top:1px solid rgba(51,255,102,.35);
+    padding-top:10px;margin-top:8px;flex-shrink:0;position:relative}
+  .input-row .pr{color:#33ff66;font-weight:700;white-space:nowrap}
+  .input-row .mis-tag{color:#ffff66;font-size:10.5px;padding:3px 8px;
+    border:1px solid rgba(255,255,102,.4);border-radius:5px;background:rgba(255,255,102,.08);
+    white-space:nowrap;display:none;font-weight:700;letter-spacing:1px;
+    display:none;align-items:center;gap:4px}
+  .input-row .mis-tag.on{display:inline-flex}
+  .input-row .mis-tag svg{width:12px;height:12px}
+  #hackInput{flex:1;background:transparent;border:none;outline:none;color:#33ff66;
+    font-family:inherit;font-size:13px;caret-color:#33ff66;min-width:0}
+
+  .side{position:fixed;top:0;right:0;bottom:0;width:540px;max-width:100%;z-index:30;
+    background:rgba(3,8,6,.98);backdrop-filter:blur(16px);
+    border-left:1.5px solid rgba(51,255,102,.35);transform:translateX(100%);
+    transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+  .side.open{transform:translateX(0)}
+  .side.mis{border-left-color:rgba(255,51,85,.5);background:rgba(10,3,6,.98)}
+  .side.ach{border-left-color:rgba(167,139,250,.5);background:rgba(5,3,12,.98)}
+  .side.news{border-left-color:rgba(34,211,238,.5);background:rgba(3,8,12,.98)}
+  .side-head{padding:16px 22px;border-bottom:1px solid rgba(51,255,102,.25);
+    display:flex;justify-content:space-between;align-items:center;gap:14px;flex-shrink:0}
+  .side.mis .side-head{border-bottom-color:rgba(255,51,85,.3)}
+  .side.ach .side-head{border-bottom-color:rgba(167,139,250,.3)}
+  .side.news .side-head{border-bottom-color:rgba(34,211,238,.3)}
+  .side-head h2{font-size:13px;letter-spacing:3px;font-weight:700;
+    display:flex;align-items:center;gap:10px}
+  .side-head h2 svg{width:18px;height:18px}
+  .side-head .ico-red{color:#ff3355}
+  .side-head .ico-green{color:#33ff66}
+  .side-head .ico-purple{color:#a78bfa}
+  .side-head .ico-cyan{color:#22d3ee}
+  .side-head button{padding:6px 12px;border:1px solid rgba(150,150,150,.4);
+    border-radius:6px;font-size:11px;letter-spacing:1.5px;color:#c6d4e6;font-family:inherit}
+  .side-head button:hover{background:rgba(255,255,255,.06)}
+  .side-search{padding:10px 22px;border-bottom:1px solid rgba(150,150,150,.15)}
+  .side-search input{width:100%;padding:9px 14px;background:rgba(10,20,15,.8);
+    border:1.5px solid rgba(51,255,102,.3);border-radius:8px;color:#33ff66;
+    font-family:'JetBrains Mono',monospace;font-size:12.5px;outline:none}
+  .side-search input:focus{border-color:#33ff66}
+  .side-body{flex:1;overflow-y:auto;padding:14px 20px 30px}
+  .side-body::-webkit-scrollbar{width:8px}
+  .side-body::-webkit-scrollbar-thumb{background:rgba(150,150,150,.3);border-radius:4px}
+
+  .mis-card{background:linear-gradient(135deg,rgba(25,10,15,.9),rgba(15,5,8,.9));
+    border:1px solid rgba(255,51,85,.25);border-radius:14px;padding:14px;
+    margin-bottom:12px;transition:.2s;position:relative;overflow:hidden}
+  .mis-card::before{content:"";position:absolute;top:0;right:0;width:120px;height:120px;
+    background:radial-gradient(circle,rgba(255,51,85,.15),transparent 70%);
+    pointer-events:none}
+  .mis-card:hover{border-color:rgba(255,51,85,.6);transform:translateY(-2px);
+    box-shadow:0 8px 24px rgba(255,51,85,.15)}
+  .mis-card.active{border-color:#ffff66;
+    background:linear-gradient(135deg,rgba(35,30,5,.95),rgba(20,15,3,.95));
+    box-shadow:0 0 0 1px rgba(255,255,102,.3),0 8px 24px rgba(255,255,102,.15)}
+  .mis-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
+  .mis-avatar{width:48px;height:48px;flex-shrink:0;
+    background:rgba(0,0,0,.3);border-radius:12px;padding:4px;position:relative}
+  .mis-avatar svg{width:100%;height:100%;display:block}
+  .mis-avatar .type-dot{position:absolute;bottom:-2px;right:-2px;
+    width:16px;height:16px;border-radius:50%;border:2px solid #000;
+    display:flex;align-items:center;justify-content:center}
+  .mis-avatar .type-dot svg{width:10px;height:10px}
+  .mis-head-info{flex:1;min-width:0}
+  .mis-cli{font-size:11px;letter-spacing:2px;font-weight:700;margin-bottom:2px;
+    text-transform:uppercase}
+  .mis-cli-type{color:#8fa3c0;font-size:10px;letter-spacing:1.5px}
+  .mis-title{font-size:14.5px;font-weight:700;color:#ffff66;line-height:1.3;margin-bottom:8px}
+  .mis-desc{font-size:12px;color:#c6d4e6;line-height:1.55;margin-bottom:10px}
+  .mis-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .mis-meta .tag{padding:4px 8px;border-radius:6px;font-size:10px;letter-spacing:1px;
+    font-weight:600;display:inline-flex;align-items:center;gap:4px;
+    background:rgba(255,51,85,.12);border:1px solid rgba(255,51,85,.3);color:#ff8899}
+  .mis-meta .tag svg{width:11px;height:11px}
+  .mis-meta .tag.rew{background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.3);color:#86efac}
+  .mis-meta .tag.risk{background:rgba(250,204,21,.12);border-color:rgba(250,204,21,.3);color:#fde047}
+  .mis-meta .tag.special{background:linear-gradient(90deg,rgba(255,51,85,.2),rgba(255,204,51,.2));
+    border-color:#ffaa33;color:#ffcc88;animation:specialglow 1.6s infinite}
+  @keyframes specialglow{50%{box-shadow:0 0 12px rgba(255,170,51,.5)}}
+  .mis-steps{background:rgba(0,0,0,.35);border-radius:8px;padding:10px;margin-bottom:10px;
+    font-family:'JetBrains Mono',monospace;font-size:11.5px}
+  .mis-steps .sr{display:flex;gap:8px;align-items:baseline;padding:2px 0;color:#6b8fad}
+  .mis-steps .sr .sn{width:18px;color:#6b8fad;flex-shrink:0}
+  .mis-steps .sr .sc{color:#33ccff;font-weight:700}
+  .mis-steps .sr.done .sc{color:#33ff66;text-decoration:line-through;opacity:.5}
+  .mis-steps .sr.now .sc{color:#ffff66;text-shadow:0 0 6px #ffff66}
+  .mis-steps .sr.now .sn{color:#ffff66;font-weight:700}
+  .mis-actions{display:flex;gap:8px}
+  .mis-actions button{flex:1;padding:9px 14px;border-radius:8px;font-size:11.5px;
+    font-weight:700;letter-spacing:1.5px;transition:.15s;display:flex;
+    align-items:center;justify-content:center;gap:6px;font-family:'JetBrains Mono',monospace}
+  .mis-actions button svg{width:12px;height:12px}
+  .mis-actions .acc{background:#33ff66;color:#06121c}
+  .mis-actions .acc:hover{background:#66ff88}
+  .mis-actions .ref{background:transparent;border:1px solid rgba(255,51,85,.4);color:#ff8899}
+  .mis-actions .ref:hover{background:rgba(255,51,85,.15)}
+  .mis-actions .abt{background:rgba(255,51,85,.15);color:#ff8899;border:1px solid rgba(255,51,85,.4)}
+
+  .ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .ach-card{background:linear-gradient(135deg,rgba(30,20,50,.6),rgba(15,10,30,.6));
+    border:1px solid rgba(167,139,250,.2);border-radius:12px;padding:12px;
+    text-align:center;transition:.2s;position:relative}
+  .ach-card.locked{opacity:.35;filter:grayscale(1)}
+  .ach-card:hover{transform:translateY(-2px);border-color:rgba(167,139,250,.6)}
+  .ach-card.unlocked{border-color:rgba(167,139,250,.5);
+    background:linear-gradient(135deg,rgba(40,25,70,.8),rgba(20,10,40,.8))}
+  .ach-icon{width:56px;height:56px;margin:0 auto 8px;position:relative;
+    display:flex;align-items:center;justify-content:center}
+  .ach-icon svg{width:100%;height:100%}
+  .ach-name{font-size:11.5px;font-weight:700;color:#e6edf7;margin-bottom:3px;line-height:1.3}
+  .ach-desc{font-size:10px;color:#8fa3c0;line-height:1.4}
+  .ach-card.unlocked .ach-name{color:#c4b5fd}
+  .ach-progress{font-size:9px;color:#6b8fad;margin-top:4px;letter-spacing:1px}
+
+  .news-ticker{background:rgba(3,10,15,.85);border-top:1.5px solid rgba(34,211,238,.3);
+    padding:8px 16px;display:flex;align-items:center;gap:10px;
+    font-family:'JetBrains Mono',monospace;font-size:11px;flex-shrink:0;
+    position:relative;z-index:8;overflow:hidden}
+  .news-ticker svg.live{width:14px;height:14px;color:#22d3ee;flex-shrink:0;
+    animation:newspulse 2s infinite}
+  @keyframes newspulse{50%{opacity:.4}}
+  .news-scroll{flex:1;overflow:hidden;white-space:nowrap;position:relative;height:16px}
+  .news-scroll .item{position:absolute;top:0;left:100%;display:inline-flex;gap:6px;
+    align-items:center;animation:scrollnews 30s linear infinite}
+  .news-scroll .item svg{width:11px;height:11px}
+  @keyframes scrollnews{from{left:100%}to{left:-100%}}
+  .news-lbl{color:#22d3ee;font-weight:700;letter-spacing:2px;font-size:10px}
+
+  .news-item{background:rgba(10,20,30,.6);border-left:3px solid #22d3ee;
+    border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:10px;
+    transition:.15s;position:relative;overflow:hidden}
+  .news-item:hover{background:rgba(15,30,45,.8)}
+  .news-item.warn{border-color:#ffcc33}
+  .news-item.bad{border-color:#ff3355}
+  .news-item.good{border-color:#33ff66}
+  .news-item .cat{font-size:9.5px;letter-spacing:2px;color:#22d3ee;
+    font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px}
+  .news-item .cat svg{width:11px;height:11px}
+  .news-item .headline{font-size:13.5px;font-weight:700;color:#e6edf7;margin-bottom:6px;line-height:1.35}
+  .news-item .body{font-size:11.5px;color:#8fa3c0;line-height:1.55}
+  .news-item .time{font-size:10px;color:#6b8fad;margin-top:6px;font-family:monospace}
+
+  #capture{position:fixed;inset:0;z-index:200;display:none;
+    background:rgba(30,0,5,.97);backdrop-filter:blur(10px);
+    align-items:center;justify-content:center;flex-direction:column;
+    text-align:center;padding:30px}
+  #capture.on{display:flex;animation:captureFade .5s}
+  @keyframes captureFade{from{opacity:0}to{opacity:1}}
+  #capture svg.big{width:min(280px,60vmin);height:min(280px,60vmin);
+    filter:drop-shadow(0 0 40px #ff3355)}
+  #capture h1{font-size:42px;font-weight:900;color:#ff3355;letter-spacing:6px;
+    margin-top:20px;font-family:'JetBrains Mono',monospace;
+    text-shadow:0 0 20px #ff3355;animation:captureBlink .8s infinite}
+  @keyframes captureBlink{50%{opacity:.4}}
+  #capture p{color:#ff8899;font-size:14px;margin-top:12px;max-width:500px;
+    line-height:1.7;font-family:'JetBrains Mono',monospace}
+  #capture .stats{display:flex;gap:24px;margin-top:24px;flex-wrap:wrap;justify-content:center}
+  #capture .st{background:rgba(0,0,0,.5);border:1px solid rgba(255,51,85,.4);
+    padding:12px 20px;border-radius:10px;font-family:'JetBrains Mono',monospace}
+  #capture .st .l{font-size:10px;letter-spacing:2px;color:#ff8899}
+  #capture .st .v{font-size:22px;font-weight:800;color:#ff3355;margin-top:4px}
+  #capture button{margin-top:26px;padding:14px 30px;border-radius:10px;
+    background:#ff3355;color:#fff;font-weight:800;letter-spacing:3px;
+    font-family:'JetBrains Mono',monospace;font-size:14px;
+    transition:.15s;box-shadow:0 8px 30px rgba(255,51,85,.4)}
+  #capture button:hover{background:#ff5577;transform:translateY(-2px)}
+
+  .toast{position:fixed;bottom:60px;right:20px;z-index:150;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .toast-item{background:rgba(3,20,10,.95);border:1.5px solid #33ff66;border-radius:10px;
+    padding:12px 18px;font-family:'JetBrains Mono',monospace;font-size:12px;
+    color:#33ff66;box-shadow:0 8px 30px rgba(51,255,102,.3);
+    display:flex;align-items:center;gap:10px;animation:toastIn .4s;min-width:220px}
+  .toast-item svg{width:20px;height:20px;flex-shrink:0}
+  .toast-item.gold{border-color:#ffcc33;color:#ffcc33;box-shadow:0 8px 30px rgba(255,204,51,.4)}
+  .toast-item.danger{border-color:#ff3355;color:#ff8899;box-shadow:0 8px 30px rgba(255,51,85,.4)}
+  @keyframes toastIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+  .toast-item.out{animation:toastOut .4s forwards}
+  @keyframes toastOut{to{transform:translateX(100%);opacity:0}}
+
+  #autocomplete{position:absolute;bottom:100%;left:0;right:0;background:rgba(2,10,5,.98);
+    border:1px solid rgba(51,255,102,.4);border-radius:8px 8px 0 0;
+    max-height:180px;overflow-y:auto;display:none;z-index:50;
+    font-family:'JetBrains Mono',monospace;font-size:12px}
+  #autocomplete.on{display:block}
+  #autocomplete .item{padding:7px 14px;cursor:pointer;color:#8fa3c0;
+    display:flex;justify-content:space-between;gap:12px;transition:.1s}
+  #autocomplete .item:hover,#autocomplete .item.sel{background:rgba(51,255,102,.12);color:#33ff66}
+  #autocomplete .item .nm{font-weight:700}
+  #autocomplete .item .ds{font-size:10.5px;color:#6b8fad}
+
+  .sb-title{font-size:10px;letter-spacing:3px;color:#6b8fad;font-weight:700;
+    margin-bottom:8px;text-transform:uppercase}
+
+  @media(max-width:800px){
+    .side{width:100%}
+    .term{padding:10px 12px;font-size:12px}
+    .head{padding:8px 12px;font-size:10px}
+    .head-tag{font-size:10px;letter-spacing:1px}
+    .stat{font-size:10px}
+    .hbtn{padding:5px 9px;font-size:10px;letter-spacing:1px}
+    .head-tag svg{width:12px;height:12px}
+    #capture h1{font-size:26px;letter-spacing:3px}
+    .ach-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<div class="app">
+  <div class="head">
+    <div class="head-left">
+      <div class="head-tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h8M8 13h6M8 17h4"/></svg>
+        ROOT@MAINFRAME
+      </div>
+      <div class="rec-dot"></div>
+      <div class="stat-group">
+        <div class="stat"><svg viewBox="0 0 24 24" fill="none" stroke="#33ff66" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg><span class="lbl">REP</span><span class="val" id="statRep">0</span></div>
+        <div class="stat"><svg viewBox="0 0 24 24" fill="none" stroke="#33ff66" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9h5a2 2 0 010 4H9M9 13h6"/></svg><span class="lbl">$</span><span class="val" id="statMoney">0</span></div>
+        <div class="stat"><svg viewBox="0 0 24 24" fill="none" stroke="#33ff66" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span class="lbl">DONE</span><span class="val" id="statDone">0</span></div>
+        <div class="stat warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg><span class="lbl">WANTED</span><span class="val" id="statWanted">0★</span></div>
+      </div>
+      <div class="timer-ring" id="timerRing">
+        <svg width="26" height="26" viewBox="0 0 26 26">
+          <circle class="ring-bg" cx="13" cy="13" r="11" fill="none" stroke-width="2.5"/>
+          <circle class="ring-fg" id="ringFg" cx="13" cy="13" r="11" fill="none" stroke-width="2.5" stroke-dasharray="69.115" stroke-dashoffset="0"/>
+        </svg>
+        <span class="tval" id="timerVal">--:--</span>
+      </div>
+    </div>
+    <div class="head-btns">
+      <button class="hbtn" id="btnSound" title="Ses (Shift+S)">
+        <svg id="soundIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15 9a4 4 0 010 6"/><path d="M18 6a8 8 0 010 12"/></svg>
+      </button>
+      <button class="hbtn" id="btnMissions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        GÖREVLER <span class="badge" id="misCount" style="display:none">0</span>
+      </button>
+      <button class="hbtn" id="btnAch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="9" r="6"/><path d="M9 15l-2 7 5-3 5 3-2-7"/></svg>
+        ROZETLER
+      </button>
+      <button class="hbtn" id="btnNews">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12v16H4zM16 8h4v12h-4"/><path d="M7 8h6M7 11h6M7 14h4"/></svg>
+        HABERLER
+      </button>
+      <button class="hbtn" id="btnDict">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12a2 2 0 012 2v14H6a2 2 0 01-2-2V4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        SÖZLÜK
+      </button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="term">
+      <div id="hackLog"></div>
+      <div class="input-row">
+        <span class="pr" id="prompt">root@mainframe:~$</span>
+        <span class="mis-tag" id="misTag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>
+          <span id="misTagText"></span>
+        </span>
+        <input id="hackInput" autocomplete="off" spellcheck="false" placeholder="komut yaz…  (help)">
+        <div id="autocomplete"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="news-ticker">
+    <svg class="live" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M4.5 4.5a10 10 0 000 15M19.5 4.5a10 10 0 010 15M7.5 7.5a6 6 0 000 9M16.5 7.5a6 6 0 010 9"/></svg>
+    <span class="news-lbl">CANLI</span>
+    <div class="news-scroll">
+      <div class="item" id="tickerItem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        <span id="tickerText">Sistem hazır. Haberler bekleniyor…</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="side mis" id="panelMissions">
+  <div class="side-head">
+    <h2 class="ico-red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>GÖREV PANELİ</h2>
+    <button data-close="panelMissions">✕ KAPAT</button>
+  </div>
+  <div class="side-body" id="missionBody"></div>
+</div>
+
+<div class="side ach" id="panelAch">
+  <div class="side-head">
+    <h2 class="ico-purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="9" r="6"/><path d="M9 15l-2 7 5-3 5 3-2-7"/></svg>ROZETLER</h2>
+    <button data-close="panelAch">✕ KAPAT</button>
+  </div>
+  <div class="side-body" id="achBody"></div>
+</div>
+
+<div class="side news" id="panelNews">
+  <div class="side-head">
+    <h2 class="ico-cyan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12v16H4zM16 8h4v12h-4"/><path d="M7 8h6M7 11h6M7 14h4"/></svg>HABER AKIŞI</h2>
+    <button data-close="panelNews">✕ KAPAT</button>
+  </div>
+  <div class="side-body" id="newsBody"></div>
+</div>
+
+<div class="side" id="panelDict">
+  <div class="side-head">
+    <h2 class="ico-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h12a2 2 0 012 2v14H6a2 2 0 01-2-2V4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>KOMUT SÖZLÜĞÜ</h2>
+    <button data-close="panelDict">✕ KAPAT</button>
+  </div>
+  <div class="side-search"><input id="dictSearch" placeholder="Komut ara…"></div>
+  <div class="side-body" id="dictBody"></div>
+</div>
+
+<div id="capture">
+  <svg class="big" viewBox="0 0 200 200">
+    <defs>
+      <radialGradient id="capGlow"><stop offset="0%" stop-color="#ff3355" stop-opacity=".8"/><stop offset="100%" stop-color="#ff3355" stop-opacity="0"/></radialGradient>
+      <filter id="capBlur"><feGaussianBlur stdDeviation="2"/></filter>
+    </defs>
+    <circle cx="100" cy="100" r="90" fill="url(#capGlow)" opacity=".5"/>
+    <circle cx="100" cy="100" r="75" fill="none" stroke="#ff3355" stroke-width="3" filter="url(#capBlur)"/>
+    <circle cx="100" cy="100" r="75" fill="none" stroke="#ff3355" stroke-width="2" stroke-dasharray="8 6">
+      <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="100" cy="100" r="60" fill="none" stroke="#ff3355" stroke-width="1.5" opacity=".6" stroke-dasharray="4 8">
+      <animateTransform attributeName="transform" type="rotate" from="360 100 100" to="0 100 100" dur="6s" repeatCount="indefinite"/>
+    </circle>
+    <g filter="url(#capBlur)">
+      <path d="M60 75 Q100 40 140 75" stroke="#ff3355" stroke-width="4" fill="none" stroke-linecap="round"/>
+      <circle cx="75" cy="95" r="8" fill="#ff3355"/>
+      <circle cx="125" cy="95" r="8" fill="#ff3355"/>
+      <path d="M70 130 Q100 155 130 130" stroke="#ff3355" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </g>
+    <text x="100" y="185" text-anchor="middle" fill="#ff3355" font-family="monospace" font-size="11" font-weight="700" letter-spacing="4">POLICE</text>
+  </svg>
+  <h1>YAKALANDIN</h1>
+  <p>Polis seni buldu. Tüm dosyaların ele geçirildi.<br>Kimliğin ifşa edildi. İtibarın sıfırlandı.</p>
+  <div class="stats" id="capStats"></div>
+  <button id="capReset">YENİ KİMLİK OLUŞTUR</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   SVG İKONLAR
+   ============================================================ */
+const SVG = {
+  icon: {
+    hack:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>',
+    steal:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>',
+    expose:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/></svg>',
+    corp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13"/><path d="M3 11h18M8 7V4h8v3"/></svg>',
+    chaos:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v8M12 14v8M2 12h8M14 12h8"/><circle cx="12" cy="12" r="2"/></svg>',
+    timer:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>',
+    coin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9h5a2 2 0 010 4H9M9 13h6"/></svg>',
+    star:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"/></svg>',
+    warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 20h20z"/><path d="M12 9v5M12 17v.5"/></svg>',
+    check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>',
+    x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+    sound:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15 9a4 4 0 010 6"/><path d="M18 6a8 8 0 010 12"/></svg>',
+    mute:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>',
+  },
+  avatar: {
+    anonim:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#1a0a10" stroke="#ff3355" stroke-width="2"/><path d="M20 30 Q32 18 44 30 L44 40 Q32 50 20 40 Z" fill="#ff3355" opacity=".15"/><path d="M18 28 Q32 14 46 28 L48 44 L46 52 L18 52 L16 44 Z" fill="#2a1520" stroke="#ff3355" stroke-width="1.5"/><circle cx="26" cy="36" r="3" fill="#ff3355"/><circle cx="38" cy="36" r="3" fill="#ff3355"/><circle cx="26" cy="36" r="1" fill="#fff"/><circle cx="38" cy="36" r="1" fill="#fff"/><path d="M24 46 Q32 50 40 46" stroke="#ff3355" stroke-width="1.5" fill="none"/></svg>`,
+    serseri_7:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#1a1008" stroke="#ffaa33" stroke-width="2"/><path d="M14 26 Q32 10 50 26 L50 28 L46 28 L46 22 Q32 12 18 22 L18 28 L14 28 Z" fill="#2a1a08" stroke="#ffaa33" stroke-width="1.5"/><ellipse cx="32" cy="36" rx="12" ry="14" fill="#3a2210"/><circle cx="27" cy="34" r="2.5" fill="#ffaa33"/><circle cx="37" cy="34" r="2.5" fill="#ffaa33"/><circle cx="27" cy="34" r="1" fill="#fff"/><circle cx="37" cy="34" r="1" fill="#fff"/><path d="M28 44 Q32 47 36 44" stroke="#ffaa33" stroke-width="1.5" fill="none"/><path d="M20 20 L24 18 M44 20 L40 18" stroke="#ffaa33" stroke-width="1.5"/></svg>`,
+    komiser_y:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#0a1224" stroke="#33aaff" stroke-width="2"/><path d="M12 34 L52 34 L52 26 L44 26 L42 16 L22 16 L20 26 L12 26 Z" fill="#122a44" stroke="#33aaff" stroke-width="1.5"/><circle cx="32" cy="12" r="4" fill="#33aaff"/><path d="M32 8 L32 4 M28 6 L36 6" stroke="#33aaff" stroke-width="1.5"/><rect x="18" y="30" width="28" height="6" fill="#33aaff" opacity=".3"/><ellipse cx="32" cy="42" rx="10" ry="6" fill="#0a1224"/><circle cx="27" cy="42" r="2" fill="#33aaff"/><circle cx="37" cy="42" r="2" fill="#33aaff"/></svg>`,
+    karga:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#0a0a0a" stroke="#ffaa33" stroke-width="2"/><path d="M32 12 Q22 14 20 24 Q18 32 24 36 Q28 38 30 34 L30 30 Q26 28 28 22 Q30 16 32 12 Z" fill="#1a1a1a" stroke="#ffaa33" stroke-width="1.2"/><path d="M32 12 Q42 14 44 24 Q46 32 40 36 Q36 38 34 34 L34 30 Q38 28 36 22 Q34 16 32 12 Z" fill="#1a1a1a" stroke="#ffaa33" stroke-width="1.2"/><circle cx="26" cy="30" r="2" fill="#ffaa33"/><circle cx="38" cy="30" r="2" fill="#ffaa33"/><path d="M32 12 L32 4 L30 8 L32 6 L34 8 Z" fill="#ffaa33"/></svg>`,
+    golge:`<svg viewBox="0 0 64 64"><defs><radialGradient id="ghv"><stop offset="0%" stop-color="#cc88ff" stop-opacity=".8"/><stop offset="100%" stop-color="#cc88ff" stop-opacity="0"/></radialGradient></defs><circle cx="32" cy="32" r="28" fill="#100820" stroke="#cc88ff" stroke-width="2"/><circle cx="32" cy="32" r="20" fill="url(#ghv)"/><path d="M18 44 Q18 24 32 20 Q46 24 46 44 Z" fill="#200a30" opacity=".85"/><circle cx="26" cy="32" r="2.5" fill="#cc88ff"/><circle cx="38" cy="32" r="2.5" fill="#cc88ff"/><circle cx="26" cy="32" r="1" fill="#fff"/><circle cx="38" cy="32" r="1" fill="#fff"/></svg>`,
+    patron_v:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#0a1a14" stroke="#88ffcc" stroke-width="2"/><path d="M18 30 L46 30 L46 50 L18 50 Z" fill="#0d2a22" stroke="#88ffcc" stroke-width="1.2"/><path d="M22 30 L32 20 L42 30 Z" fill="#88ffcc" opacity=".2"/><path d="M24 34 L40 34 M24 38 L40 38" stroke="#88ffcc" stroke-width="1"/><path d="M26 44 L32 48 L38 44" stroke="#88ffcc" stroke-width="1.5" fill="none"/><path d="M28 20 Q32 16 36 20" stroke="#88ffcc" stroke-width="1.5"/></svg>`,
+    doktor_k:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#1a0810" stroke="#ff6666" stroke-width="2"/><path d="M22 18 L42 18 L42 24 L22 24 Z" fill="#2a1020" stroke="#ff6666" stroke-width="1.2"/><ellipse cx="32" cy="38" rx="12" ry="14" fill="#1a0810"/><circle cx="32" cy="22" r="6" fill="#ff6666" opacity=".3"/><circle cx="32" cy="22" r="3" fill="#ff6666"/><path d="M26 36 Q32 42 38 36" stroke="#ff6666" stroke-width="1.5" fill="none"/></svg>`,
+    gazeteci:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#0a1828" stroke="#22d3ee" stroke-width="2"/><rect x="20" y="26" width="24" height="20" rx="2" fill="#0f2a3d" stroke="#22d3ee" stroke-width="1.2"/><path d="M24 32 L40 32 M24 36 L36 36 M24 40 L40 40" stroke="#22d3ee" stroke-width="1"/><circle cx="26" cy="20" r="2" fill="#22d3ee"/><circle cx="38" cy="20" r="2" fill="#22d3ee"/><path d="M22 22 Q32 16 42 22" stroke="#22d3ee" stroke-width="1.5" fill="none"/></svg>`,
+    avukat:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="#141410" stroke="#fde047" stroke-width="2"/><circle cx="32" cy="32" r="18" fill="none" stroke="#fde047" stroke-width="1" opacity=".4"/><path d="M32 14 L32 50 M20 32 L44 32" stroke="#fde047" stroke-width="1.5"/><path d="M20 32 L32 26 L44 32" stroke="#fde047" stroke-width="1.5" fill="none"/><circle cx="32" cy="50" r="3" fill="#fde047"/><rect x="16" y="46" width="32" height="3" fill="#fde047" opacity=".5"/></svg>`,
+  },
+  ach: {
+    first_hack:`<svg viewBox="0 0 64 64"><defs><linearGradient id="a1"><stop offset="0%" stop-color="#33ff66"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient></defs><circle cx="32" cy="32" r="26" fill="#051020" stroke="url(#a1)" stroke-width="3"/><path d="M22 30 L32 22 L42 30 M20 44 L44 44" stroke="#33ff66" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="32" cy="38" r="4" fill="#33ff66"/></svg>`,
+    first_steal:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#1a1005" stroke="#ffaa33" stroke-width="3"/><path d="M20 42 Q20 26 32 24 Q44 26 44 42" stroke="#ffaa33" stroke-width="3" fill="none"/><circle cx="26" cy="36" r="2" fill="#ffaa33"/><circle cx="38" cy="36" r="2" fill="#ffaa33"/></svg>`,
+    expose_pro:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#051828" stroke="#33aaff" stroke-width="3"/><circle cx="32" cy="32" r="10" fill="none" stroke="#33aaff" stroke-width="3"/><circle cx="32" cy="32" r="3" fill="#33aaff"/><path d="M12 32 L52 32 M32 12 L32 52" stroke="#33aaff" stroke-width="1.5" opacity=".4"/></svg>`,
+    rich:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#1a1a05" stroke="#ffcc33" stroke-width="3"/><path d="M24 20 L32 32 L40 20 M24 44 L32 32 L40 44" stroke="#ffcc33" stroke-width="3" fill="none" stroke-linecap="round"/></svg>`,
+    veteran:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#200520" stroke="#cc88ff" stroke-width="3"/><path d="M32 14 L36 26 L48 26 L38 34 L42 46 L32 38 L22 46 L26 34 L16 26 L28 26 Z" fill="#cc88ff" opacity=".4" stroke="#cc88ff" stroke-width="1.5"/></svg>`,
+    ghost:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#051010" stroke="#88ffcc" stroke-width="3"/><path d="M20 46 Q20 22 32 20 Q44 22 44 46 L40 42 L36 46 L32 42 L28 46 L24 42 Z" fill="#88ffcc" opacity=".3" stroke="#88ffcc" stroke-width="1.5"/><circle cx="26" cy="34" r="2" fill="#88ffcc"/><circle cx="38" cy="34" r="2" fill="#88ffcc"/></svg>`,
+    chaos:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#200505" stroke="#ff3355" stroke-width="3"/><path d="M22 24 L32 14 L42 24 M22 40 L32 50 L42 40" stroke="#ff3355" stroke-width="3" fill="none" stroke-linejoin="round"/><circle cx="32" cy="32" r="4" fill="#ff3355"/></svg>`,
+    survivor:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#0a1205" stroke="#a3e635" stroke-width="3"/><path d="M32 12 L32 22 M32 42 L32 52 M12 32 L22 32 M42 32 L52 32" stroke="#a3e635" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="32" r="8" fill="none" stroke="#a3e635" stroke-width="3"/></svg>`,
+    timer:`<svg viewBox="0 0 64 64"><circle cx="32" cy="34" r="22" fill="#051020" stroke="#fde047" stroke-width="3"/><path d="M32 22 L32 34 L40 40" stroke="#fde047" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M26 10 L38 10 M32 10 L32 14" stroke="#fde047" stroke-width="3" stroke-linecap="round"/></svg>`,
+    contact:`<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#051015" stroke="#22d3ee" stroke-width="3"/><circle cx="26" cy="28" r="6" fill="#22d3ee" opacity=".5"/><circle cx="40" cy="28" r="6" fill="#22d3ee" opacity=".5"/><path d="M18 46 Q32 38 46 46" stroke="#22d3ee" stroke-width="2.5" fill="none"/></svg>`,
+    perfect:`<svg viewBox="0 0 64 64"><defs><linearGradient id="a2"><stop offset="0%" stop-color="#ffcc33"/><stop offset="100%" stop-color="#ff3355"/></linearGradient></defs><circle cx="32" cy="32" r="26" fill="#200510" stroke="url(#a2)" stroke-width="3"/><path d="M20 32 L28 40 L44 24" stroke="#ffcc33" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`,
+  },
+};
+
+/* ============================================================
+   SES MOTORU — GÜÇLENDİRİLMİŞ
+   ============================================================ */
+const Audio2 = {
+  ctx: null, enabled: true, master: null, ambient: null,
+  init() {
+    if (this.ctx) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { this.enabled = false; return; }
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 1.0;
+      this.master.connect(this.ctx.destination);
+      this.startAmbient();
+    } catch (e) { console.warn("audio:", e); this.enabled = false; }
+  },
+  startAmbient() {
+    try {
+      const o1 = this.ctx.createOscillator();
+      const o2 = this.ctx.createOscillator();
+      const o3 = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      const lp = this.ctx.createBiquadFilter();
+      o1.frequency.value = 55; o2.frequency.value = 82.5; o3.frequency.value = 110;
+      o1.type = "sine"; o2.type = "triangle"; o3.type = "sine";
+      lp.type = "lowpass"; lp.frequency.value = 450;
+      g.gain.value = 0.12;
+      o1.connect(lp); o2.connect(lp); o3.connect(lp);
+      lp.connect(g).connect(this.master);
+      o1.start(); o2.start(); o3.start();
+      this.ambient = { o1, o2, o3, g };
+    } catch(e) { console.warn(e); }
+  },
+  beep(freq, dur, type = "square", vol = 0.15) {
+    if (!this.ctx || !this.enabled) return;
+    try {
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.frequency.value = freq; o.type = type;
+      const t = this.ctx.currentTime;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(Math.min(1, vol * 2.5), t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      o.connect(g).connect(this.master);
+      o.start(t); o.stop(t + dur + 0.05);
+    } catch(e) {}
+  },
+  key() { this.beep(2000 + Math.random() * 400, 0.02, "square", 0.12); },
+  enter() {
+    this.beep(880, 0.05, "square", 0.30);
+    setTimeout(() => this.beep(1200, 0.04, "square", 0.24), 40);
+  },
+  ok() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => this.beep(f, 0.13, "sine", 0.35), i * 70)); },
+  fail() {
+    this.beep(300, 0.14, "sawtooth", 0.38);
+    setTimeout(() => this.beep(200, 0.18, "sawtooth", 0.38), 100);
+    setTimeout(() => this.beep(150, 0.28, "sawtooth", 0.38), 220);
+  },
+  alarm() { for (let i = 0; i < 8; i++) setTimeout(() => this.beep(i % 2 ? 800 : 1200, 0.13, "square", 0.45), i * 150); },
+  coin() {
+    this.beep(1047, 0.06, "square", 0.32);
+    setTimeout(() => this.beep(1319, 0.10, "square", 0.32), 60);
+    setTimeout(() => this.beep(1760, 0.14, "square", 0.28), 150);
+  },
+  ach() { [523, 659, 784, 1047, 1319].forEach((f, i) => setTimeout(() => this.beep(f, 0.15, "sine", 0.38), i * 80)); },
+  tick() { this.beep(1600, 0.018, "square", 0.14); },
+  click() { this.beep(720, 0.025, "square", 0.24); },
+  clickDeep() {
+    this.beep(400, 0.045, "triangle", 0.28);
+    setTimeout(() => this.beep(620, 0.03, "triangle", 0.18), 25);
+  },
+  ui() {
+    this.beep(600, 0.03, "sine", 0.18);
+    setTimeout(() => this.beep(900, 0.04, "sine", 0.15), 40);
+  },
+  mission() {
+    [659, 880, 1175].forEach((f, i) => setTimeout(() => this.beep(f, 0.15, "sine", 0.38), i * 110));
+    setTimeout(() => this.beep(1568, 0.28, "sine", 0.30), 420);
+  },
+  notify() {
+    this.beep(1046, 0.06, "sine", 0.28);
+    setTimeout(() => this.beep(1318, 0.10, "sine", 0.24), 70);
+  },
+  step() { [880, 1108, 1318].forEach((f, i) => setTimeout(() => this.beep(f, 0.055, "sine", 0.28), i * 35)); },
+  panel() {
+    this.beep(500, 0.045, "triangle", 0.24);
+    setTimeout(() => this.beep(750, 0.06, "triangle", 0.20), 50);
+  },
+  panelClose() {
+    this.beep(700, 0.045, "triangle", 0.22);
+    setTimeout(() => this.beep(450, 0.055, "triangle", 0.18), 45);
+  },
+  warning() {
+    this.beep(880, 0.06, "square", 0.35);
+    setTimeout(() => this.beep(660, 0.08, "square", 0.35), 80);
+  },
+  hover() { this.beep(1400, 0.012, "sine", 0.08); },
+  boot() { [440, 554, 659, 880].forEach((f, i) => setTimeout(() => this.beep(f, 0.11, "sine", 0.28), i * 100)); },
+  toggle() {
+    this.enabled = !this.enabled;
+    if (this.enabled && !this.ctx) this.init();
+    if (this.ambient) this.ambient.g.gain.value = this.enabled ? 0.12 : 0;
+    const btn = document.getElementById("btnSound");
+    if (btn) btn.innerHTML = (this.enabled ? SVG.icon.sound : SVG.icon.mute).replace("<svg", '<svg id="soundIcon"');
+    if (this.enabled) this.notify();
+  },
+};
+
+/* ============================================================
+   MATRIX
+   ============================================================ */
+const MATRIX_STYLES = {
+  classic:{ chars:"アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789", normal:"#33ff66", head:"#ccffcc", fade:"rgba(0,0,0,0.08)" },
+  binary:{ chars:"01", normal:"#33ccff", head:"#ccffff", fade:"rgba(0,0,0,0.08)" },
+  red:{ chars:"アイウエオカキクケコ0123456789!@#$%", normal:"#ff3355", head:"#ffcccc", fade:"rgba(10,0,0,0.08)" },
+  purple:{ chars:"アイウエオカキクケコサシスセソタチツテト", normal:"#cc88ff", head:"#eeccff", fade:"rgba(5,0,10,0.08)" },
+  hex:{ chars:"0123456789ABCDEF", normal:"#88ffcc", head:"#ccffdd", fade:"rgba(0,10,5,0.08)" },
+  rainbow:{ chars:"アイウエオカキクケコサシスセソタチツテト", rainbow:true, fade:"rgba(0,0,0,0.08)" },
+  ancient:{ chars:"ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ", normal:"#ffaa33", head:"#ffdd88", fade:"rgba(10,5,0,0.08)" },
+};
+let matrixStyle = "classic", matrixAnim = null, matrixDrops = [];
+function startMatrix() {
+  const cvs = document.getElementById("matrix");
+  cvs.width = innerWidth; cvs.height = innerHeight;
+  const ctx = cvs.getContext("2d");
+  const fs = 16, cols = Math.floor(cvs.width / fs);
+  matrixDrops = new Array(cols).fill(0).map(() => Math.random() * cvs.height / fs);
+  const style = MATRIX_STYLES[matrixStyle];
+  const chars = style.chars;
+  let hue = 0;
+  function frame() {
+    ctx.fillStyle = style.fade;
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+    ctx.font = fs + "px monospace";
+    if (style.rainbow) hue = (hue + 0.6) % 360;
+    for (let i = 0; i < matrixDrops.length; i++) {
+      const ch = chars[Math.random() * chars.length | 0];
+      const y = matrixDrops[i] * fs;
+      if (style.rainbow) {
+        ctx.fillStyle = Math.random() < 0.02
+          ? `hsl(${(hue + i * 3) % 360}, 100%, 90%)`
+          : `hsl(${(hue + i * 3) % 360}, 100%, 60%)`;
+      } else {
+        ctx.fillStyle = Math.random() < 0.02 ? style.head : style.normal;
+      }
+      ctx.globalAlpha = 0.5 + Math.random() * 0.4;
+      ctx.fillText(ch, i * fs, y);
+      ctx.globalAlpha = 1;
+      if (y > cvs.height && Math.random() > 0.975) matrixDrops[i] = 0;
+      matrixDrops[i]++;
+    }
+    matrixAnim = requestAnimationFrame(frame);
+  }
+  cancelAnimationFrame(matrixAnim); frame();
+}
+startMatrix();
+addEventListener("resize", startMatrix);
+
+/* ============================================================
+   DATA
+   ============================================================ */
+const CONTACTS = {
+  anonim:{ name:"Anonim", emoji:"🎭", color:"#ff6666", type:"bilinmeyen", city:"istanbul" },
+  serseri_7:{ name:"Serseri-7", emoji:"🎩", color:"#ffaa33", type:"dolandırıcı", city:"berlin" },
+  komiser_y:{ name:"Komiser Y.", emoji:"👮", color:"#33aaff", type:"polis", city:"istanbul" },
+  karga:{ name:"Karga", emoji:"🐦‍⬛", color:"#ffaa33", type:"usta hırsız", city:"nyc" },
+  golge:{ name:"Gölge", emoji:"🌑", color:"#cc88ff", type:"hacker lideri", city:"tokyo" },
+  patron_v:{ name:"Patron V.", emoji:"🕴️", color:"#88ffcc", type:"iş insanı", city:"moskova" },
+  doktor_k:{ name:"Doktor K.", emoji:"🥼", color:"#ff6666", type:"gizemli", city:"berlin" },
+  gazeteci:{ name:"Gazeteci A.", emoji:"📰", color:"#22d3ee", type:"basın", city:"istanbul" },
+  avukat:{ name:"Avukat D.", emoji:"⚖️", color:"#fde047", type:"hukuk", city:"nyc" },
+};
+
+const MISSION_TEMPLATES = [
+  { client:"anonim", type:"hack", title:"Kimlik sunucusuna sız", desc:"Güvenli bir sunucudaki kullanıcı kayıtlarını kopyala. İz bırakma.", reward:2500, rep:5, risk:1, steps:[
+    {cmd:"nmap {t}", d:"Port taraması yap"},
+    {cmd:"ssh root@{t}", d:"Sunucuya bağlan"},
+    {cmd:"ls /etc", d:"Yapılandırmayı incele"},
+    {cmd:"cat /etc/passwd", d:"Kullanıcı listesini kopyala"},
+    {cmd:"clean", d:"İzleri sil ve çık"}]},
+  { client:"anonim", type:"hack", title:"Firma kayıtlarını değiştir", desc:"Hedef firmanın müşteri veritabanında belirli kayıtları değiştir.", reward:3500, rep:7, risk:1, steps:[
+    {cmd:"nmap {t}", d:"Hedefi tara"},
+    {cmd:"ssh root@{t}", d:"Bağlan"},
+    {cmd:"inject {t}", d:"Kayıtları değiştir"},
+    {cmd:"clean", d:"İz bırakma"}]},
+  { client:"anonim", type:"chaos", title:"Şirket hisselerini sars", desc:"Yanlış haber sızdır, hisse %5 düşsün.", reward:12000, rep:15, risk:3, steps:[
+    {cmd:"scan", d:"Zayıf noktaları bul"},
+    {cmd:"exploit {t}", d:"Sisteme gir"},
+    {cmd:"overload {t}", d:"Yük bindir"},
+    {cmd:"vanish", d:"Kaybol"}]},
+  { client:"serseri_7", type:"steal", title:"Yanlış kişiyi kurtar", desc:"Bir 'eski dostunun' kaydını veritabanından sil.", reward:3000, rep:5, risk:1, steps:[
+    {cmd:"scan", d:"Ağı tara"},
+    {cmd:"nmap {t}", d:"Hedef kasayı tara"},
+    {cmd:"exploit {t}", d:"Güvenliği aş"},
+    {cmd:"clean", d:"İz bırakma"}]},
+  { client:"serseri_7", type:"steal", title:"Kimlik takası", desc:"Birinin sosyal medya hesabını 3 günlüğüne devral.", reward:5000, rep:7, risk:2, steps:[
+    {cmd:"scan", d:"Ağ tara"},
+    {cmd:"exploit {t}", d:"Exploit yap"},
+    {cmd:"backdoor", d:"Arka kapı bırak"},
+    {cmd:"clean", d:"Temizle"}]},
+  { client:"serseri_7", type:"steal", title:"Sahte ehliyet şebekesi", desc:"Sahte ehliyet üreten grubun veritabanını kopyala.", reward:9000, rep:14, risk:2, steps:[
+    {cmd:"scan", d:"Tara"},
+    {cmd:"nmap {t}", d:"Hedefi tara"},
+    {cmd:"ssh root@{t}", d:"Bağlan"},
+    {cmd:"cat /etc/passwd", d:"Veriyi kopyala"},
+    {cmd:"clean", d:"İz sil"}]},
+  { client:"komiser_y", type:"expose", title:"Küçük dolandırıcı", desc:"Sahte eşya satan bir satıcının IP'sini bul.", reward:1500, rep:8, risk:0, steps:[
+    {cmd:"scan", d:"Şüpheli ağı tara"},
+    {cmd:"whois {t}", d:"Bilgi topla"},
+    {cmd:"submit", d:"Kanıtları gönder"}]},
+  { client:"komiser_y", type:"expose", title:"Sahte kimlik şebekesi", desc:"Sahte kimlik üreten grubun sunucusuna gir.", reward:7500, rep:20, risk:2, steps:[
+    {cmd:"scan", d:"Ağı tara"},
+    {cmd:"whois {t}", d:"Hedef bilgisi"},
+    {cmd:"trace {t}", d:"Konumunu izle"},
+    {cmd:"submit", d:"Kanıt gönder"}]},
+  { client:"komiser_y", type:"expose", title:"Kaçak satıcı", desc:"Karanlık ağda satış yapan birinin konumunu tahmin et.", reward:9000, rep:22, risk:3, steps:[
+    {cmd:"scan", d:"Tara"},
+    {cmd:"trace {t}", d:"Konumunu bul"},
+    {cmd:"submit", d:"Polise teslim et"}]},
+  { client:"karga", type:"steal", title:"Koleksiyoncu kasası", desc:"Özel bir koleksiyoncunun dijital kasa şifresini kır.", reward:4000, rep:6, risk:1, steps:[
+    {cmd:"nmap {t}", d:"Kasayı tara"},
+    {cmd:"crack hash123", d:"Şifreyi kır"},
+    {cmd:"clean", d:"İz sil"}]},
+  { client:"karga", type:"steal", title:"Müzeden eser çal", desc:"Müzenin sistemine gir, kayıtları sil.", reward:12000, rep:15, risk:2, steps:[
+    {cmd:"scan", d:"Tara"},
+    {cmd:"nmap {t}", d:"Hedefi tara"},
+    {cmd:"inject {t}", d:"Kayıtları sil"},
+    {cmd:"vanish", d:"Kaybol"}]},
+  { client:"karga", type:"steal", title:"Havayolu sistemi", desc:"Bir uçuşun yolcu listesini değiştir.", reward:40000, rep:30, risk:4, steps:[
+    {cmd:"nmap {t}", d:"Tara"},
+    {cmd:"ssh root@{t}", d:"Bağlan"},
+    {cmd:"inject {t}", d:"Yolcu listesini değiştir"},
+    {cmd:"clean", d:"Temizle"},
+    {cmd:"vanish", d:"Kaybol"}]},
+  { client:"golge", type:"chaos", title:"Şehir ağını karıştır", desc:"Bir bölgede kısa süreli kesinti yarat.", reward:25000, rep:25, risk:4, steps:[
+    {cmd:"scan", d:"Zayıf düğümleri bul"},
+    {cmd:"exploit {t}", d:"Sisteme gir"},
+    {cmd:"overload {t}", d:"Yük bindir"},
+    {cmd:"vanish", d:"Kaybol"}]},
+  { client:"golge", type:"hack", title:"Banka merkez sistemine gir", desc:"Sadece oku, dokunma.", reward:60000, rep:40, risk:5, steps:[
+    {cmd:"nmap {t}", d:"Tara"},
+    {cmd:"exploit {t}", d:"Exploit"},
+    {cmd:"ssh root@{t}", d:"Bağlan"},
+    {cmd:"cat /etc/passwd", d:"Veriyi çek"},
+    {cmd:"clean", d:"İz sil"},
+    {cmd:"vanish", d:"Kaybol"}]},
+  { client:"patron_v", type:"corp", title:"Rakip firmayı yavaşlat", desc:"Rakip firmanın sitesine DDoS.", reward:15000, rep:10, risk:3, steps:[
+    {cmd:"nmap {t}", d:"Tara"},
+    {cmd:"overload {t}", d:"Yük bindir"},
+    {cmd:"vanish", d:"Kaybol"}]},
+  { client:"patron_v", type:"corp", title:"Sözleşme değiştir", desc:"Rakip firmanın sözleşmesindeki fiyatları düşür.", reward:35000, rep:25, risk:4, steps:[
+    {cmd:"nmap {t}", d:"Tara"},
+    {cmd:"ssh admin@{t}", d:"Yönetici hesabına gir"},
+    {cmd:"inject {t}", d:"Veriyi değiştir"},
+    {cmd:"clean", d:"İz sil"}]},
+  { client:"doktor_k", type:"chaos", title:"Gölge dosyası", desc:"Kimsenin bahsetmediği bir dosyayı çek.", reward:50000, rep:40, risk:5, steps:[
+    {cmd:"scan", d:"Ağı tara"},
+    {cmd:"exploit {t}", d:"Sisteme gir"},
+    {cmd:"ssh root@{t}", d:"Bağlan"},
+    {cmd:"cat /etc/passwd", d:"Dosyayı çek"},
+    {cmd:"clean", d:"İz sil"},
+    {cmd:"vanish", d:"Kaybol"}]},
+  { client:"gazeteci", type:"expose", title:"Şirket skandalı", desc:"Bir şirketin gizli belgelerini bul.", reward:6000, rep:10, risk:1, steps:[
+    {cmd:"whois {t}", d:"Şirketi araştır"},
+    {cmd:"scan", d:"Ağını tara"},
+    {cmd:"submit", d:"Belgeleri gönder"}]},
+  { client:"avukat", type:"expose", title:"Kayıp kanıt", desc:"Bir davada kaybolan kanıtı bul.", reward:8500, rep:12, risk:1, steps:[
+    {cmd:"trace {t}", d:"İz sür"},
+    {cmd:"ssh root@{t}", d:"Sunucuya bağlan"},
+    {cmd:"cat /etc/passwd", d:"Kanıtı kopyala"},
+    {cmd:"submit", d:"Teslim et"}]},
+];
+
+const ACHIEVEMENTS = [
+  { id:"first_hack", name:"İlk Adım", desc:"İlk görevini tamamla", check:s => s.done >= 1 },
+  { id:"first_steal", name:"Usta Hırsız", desc:"İlk hırsızlık görevini bitir", check:s => s.history.some(m => m.type === "steal" && !m.refused) },
+  { id:"expose_pro", name:"İhbar", desc:"Polis için 3 görev yap", check:s => s.history.filter(m => m.client === "komiser_y" && !m.refused).length >= 3 },
+  { id:"rich", name:"Zengin", desc:"10.000$ kazan", check:s => s.money >= 10000 },
+  { id:"veteran", name:"Kıdemli", desc:"10 görev tamamla", check:s => s.done >= 10 },
+  { id:"ghost", name:"Hayalet", desc:"Hiç yakalanmadan 5 görev", check:s => s.done >= 5 && s.wanted === 0 },
+  { id:"chaos", name:"Kaos Ustası", desc:"3 kaos görevi yap", check:s => s.history.filter(m => m.type === "chaos" && !m.refused).length >= 3 },
+  { id:"survivor", name:"Hayatta Kalan", desc:"5★ aranmayla görev tamamla", check:s => s.wanted >= 5 },
+  { id:"timer", name:"Dakik", desc:"Son 10 sn'de bitir", check:s => s.lastMissionTimeLeft !== undefined && s.lastMissionTimeLeft <= 10 },
+  { id:"contact", name:"Bağlantı", desc:"5 farklı kişiyle çalış", check:s => new Set(s.history.filter(m => !m.refused).map(m => m.client)).size >= 5 },
+  { id:"perfect", name:"Mükemmel", desc:"5 üst üste başarılı", check:s => s.streak >= 5 },
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  rep:0, money:0, done:0, wanted:0, streak:0,
+  inbox:[], history:[],
+  contacts: new Set(["anonim", "serseri_7"]),
+  active:null, activeStep:0,
+  unlockedAch: new Set(),
+  news: [],
+  booted:false,
+  timerRemaining:0, timerInterval:null,
+  lastMissionTimeLeft: undefined,
+};
+function saveState() {
+  try { localStorage.setItem("golge_v2", JSON.stringify({
+    rep:state.rep, money:state.money, done:state.done, wanted:state.wanted, streak:state.streak
+  })); } catch(e){}
+}
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem("golge_v2") || "null");
+    if (s) { state.rep=s.rep||0; state.money=s.money||0; state.done=s.done||0; state.wanted=s.wanted||0; state.streak=s.streak||0; }
+  } catch(e){}
+}
+loadState();
+
+function updateStats() {
+  document.getElementById("statRep").textContent = state.rep;
+  document.getElementById("statMoney").textContent = "$" + state.money.toLocaleString("tr-TR");
+  document.getElementById("statDone").textContent = state.done;
+  const wl = document.getElementById("statWanted");
+  wl.textContent = state.wanted + "★";
+  wl.parentElement.className = "stat " + (state.wanted >= 4 ? "danger" : state.wanted >= 2 ? "warn" : "");
+  const c = state.inbox.filter(m => !m.done).length;
+  const badge = document.getElementById("misCount");
+  badge.textContent = c;
+  badge.style.display = c > 0 ? "flex" : "none";
+  const btnM = document.getElementById("btnMissions");
+  btnM.classList.toggle("alert", !state.active && c > 0);
+  btnM.classList.toggle("active", !!state.active);
+  const tag = document.getElementById("misTag");
+  if (state.active) {
+    tag.classList.add("on");
+    document.getElementById("misTagText").textContent = `${state.active.id} · ${state.activeStep+1}/${state.active.steps.length}`;
+  } else tag.classList.remove("on");
+}
+
+/* ============================================================
+   FS
+   ============================================================ */
+const FS = {
+  type:"dir", children:{
+    root:{ type:"dir", children:{
+      "README.md":{ type:"file", content:"# GÖLGE AĞI v2\n\naccept <id> → görev al\nhint → sıradaki adım\nabort → iptal\n\nKısayollar (Shift+): J=Görevler K=Sözlük N=Haberler A=Rozetler S=Ses" },
+      ".bash_history":{ type:"file", content:"nmap\nssh root@target\nclean\nvanish" },
+      notes:{ type:"dir", children:{
+        "plan.txt":{ type:"file", content:"1. Güven kazan\n2. İtibar yükselt\n3. Hayatta kal\n4. Kaybol" }}},
+    }},
+    etc:{ type:"dir", children:{
+      "passwd":{ type:"file", content:"root:x:0:0:root:/root:/bin/bash\nanon:x:1000:1000::/home/anon:/bin/bash\nadmin:x:1001:1001::/home/admin:/bin/bash" },
+      "hosts":{ type:"file", content:"127.0.0.1\tlocalhost\n10.0.0.5\tmainframe.local" },
+    }},
+    var:{ type:"dir", children:{
+      log:{ type:"dir", children:{
+        "auth.log":{ type:"file", content:"[03:22] Yeni oturum: anon\n[03:45] Bağlantı kapatıldı" }}}}},
+    home:{ type:"dir", children:{
+      anon:{ type:"dir", children:{
+        "kimlik.txt":{ type:"file", content:"Adın yok. Yüzün yok.\nSadece imzan var: GÖLGE" }}}}},
+  }
+};
+function getNode(abs) {
+  if (abs === "/" || abs === "") return FS;
+  const parts = abs.split("/").filter(Boolean);
+  let n = FS;
+  for (const p of parts) { if (!n.children || !n.children[p]) return null; n = n.children[p]; }
+  return n;
+}
+function resolvePath(p) {
+  if (!p) return cwd;
+  let base;
+  if (p.startsWith("/")) base = p;
+  else if (p.startsWith("~")) base = "/root" + p.slice(1);
+  else base = (cwd === "/" ? "" : cwd) + "/" + p;
+  const parts = [];
+  for (const seg of base.split("/")) {
+    if (!seg || seg === ".") continue;
+    if (seg === "..") parts.pop(); else parts.push(seg);
+  }
+  return "/" + parts.join("/");
+}
+function parentPath(p) { return p.split("/").slice(0, -1).join("/") || "/"; }
+function basename(p) { return p.split("/").pop(); }
+
+/* ============================================================
+   TERM
+   ============================================================ */
+const hackLog = document.getElementById("hackLog");
+const hackInput = document.getElementById("hackInput");
+const promptEl = document.getElementById("prompt");
+let cwd = "/root", history = [], histIdx = -1;
+const rand = (a) => a[Math.floor(Math.random() * a.length)];
+const randInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function log(content, cls = "") {
+  const line = document.createElement("div");
+  line.className = "l " + cls;
+  if (typeof content === "string") line.textContent = content;
+  else if (content && content.html) line.innerHTML = content.html;
+  hackLog.appendChild(line);
+  hackLog.scrollTop = hackLog.scrollHeight;
+  while (hackLog.children.length > 600) hackLog.removeChild(hackLog.firstChild);
+}
+function updatePrompt() { promptEl.textContent = `root@mainframe:${cwd === "/root" ? "~" : cwd}$`; }
+async function logTyped(text, cls = "", speed = 12) {
+  return new Promise((resolve) => {
+    const line = document.createElement("div");
+    line.className = "l " + cls;
+    hackLog.appendChild(line);
+    let i = 0;
+    const iv = setInterval(() => {
+      line.textContent += text[i++] || "";
+      hackLog.scrollTop = hackLog.scrollHeight;
+      if (i >= text.length) { clearInterval(iv); resolve(); }
+    }, speed);
+  });
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function money(n) { return "$" + n.toLocaleString("tr-TR"); }
+
+/* ============================================================
+   MISSION
+   ============================================================ */
+let misCounter = 0;
+function makeMission(forceClient) {
+  if (state.rep >= 10) state.contacts.add("komiser_y");
+  if (state.rep >= 15) state.contacts.add("karga");
+  if (state.rep >= 20) state.contacts.add("golge");
+  if (state.rep >= 25) state.contacts.add("gazeteci");
+  if (state.rep >= 30) state.contacts.add("patron_v");
+  if (state.rep >= 40) state.contacts.add("avukat");
+  if (state.rep >= 60) state.contacts.add("doktor_k");
+  let available = MISSION_TEMPLATES.filter(t => state.contacts.has(t.client));
+  if (forceClient) available = available.filter(t => t.client === forceClient);
+  if (!available.length) available = MISSION_TEMPLATES.filter(t => state.contacts.has(t.client));
+  if (!available.length) return null;
+  const t = rand(available);
+  misCounter++;
+  const target = `10.0.${randInt(0,5)}.${randInt(2,250)}`;
+  const diffMult = 1 + Math.floor(state.rep / 25) * 0.15;
+  const reward = Math.round((t.reward + randInt(-200, 400)) * diffMult);
+  let steps = t.steps.map(s => ({ cmd: s.cmd.replace(/{t}/g, target), d: s.d }));
+  const extraSteps = Math.floor(state.rep / 40);
+  if (extraSteps > 0) {
+    const extras = [
+      { cmd:`scan`, d:"Son kontrol" },
+      { cmd:`whois ${target}`, d:"Hedefi doğrula" },
+      { cmd:`cat /etc/hosts`, d:"Yapılandırmayı oku" },
+    ];
+    for (let i = 0; i < Math.min(extraSteps, 3); i++) steps.splice(steps.length - 1, 0, extras[i % extras.length]);
+  }
+  const baseTime = 30 + steps.length * 8;
+  const time = Math.round(baseTime / diffMult);
+  const special = Math.random() < 0.08;
+  return {
+    id:"M" + String(misCounter).padStart(3, "0"),
+    client: t.client, type: t.type,
+    title: special ? "⚡ " + t.title : t.title,
+    desc: t.desc, reward: special ? reward * 3 : reward,
+    rep: t.rep, risk: t.risk, time, special, target, steps,
+    done: false, arrived: Date.now(),
+  };
+}
+function notifyMission(mis) {
+  const c = CONTACTS[mis.client];
+  log("", "");
+  log({ html: `<span class="mission-box">
+    <span class="mh">${mis.special ? "🔥" : "📨"} YENİ GÖREV — ${mis.id}</span>
+    <div class="mr"><b>Gönderen:</b> <span style="color:${c.color};font-weight:700">${c.emoji} ${c.name}</span> · ${c.type}</div>
+    <div class="mr"><b>Konu:</b> ${escapeHtml(mis.title)}</div>
+    <div class="mr"><b>Ödeme:</b> ${money(mis.reward)} · <b>İtibar:</b> +${mis.rep} · <b>Süre:</b> ${mis.time}s · <b>Adım:</b> ${mis.steps.length}</div>
+    <div class="mr" style="color:#ffff66">→ accept ${mis.id}  ·  refuse ${mis.id}</div>
+  </span>` });
+  log("", "");
+  Audio2.mission();
+  updateStats();
+  addNews("mission", mis);
+}
+let spawnTimer = null;
+function scheduleSpawn(delay) {
+  clearTimeout(spawnTimer);
+  spawnTimer = setTimeout(() => {
+    if (state.inbox.filter(m => !m.done).length < 6) {
+      const m = makeMission();
+      if (m) { state.inbox.unshift(m); notifyMission(m); renderMissions(); }
+    }
+    scheduleSpawn(randInt(25000, 45000));
+  }, delay);
+}
+
+/* ============================================================
+   FLOW
+   ============================================================ */
+function findMission(id) { return state.inbox.find(m => m.id.toLowerCase() === id.toLowerCase() && !m.done); }
+function acceptMission(id, fromPanel) {
+  const m = findMission(id);
+  if (!m) { log(`${id}: görev bulunamadı.`, "err"); Audio2.fail(); return; }
+  if (state.active) { log(`Aktif görev var: ${state.active.id}. 'abort' ile iptal et.`, "warn"); return; }
+  state.active = m;
+  state.activeStep = 0;
+  state.timerRemaining = m.time;
+  startTimer();
+  if (fromPanel) closeSide("panelMissions");
+  updateStats();
+  renderMissions();
+  showBriefing(m);
+  Audio2.enter();
+}
+function showBriefing(m) {
+  const c = CONTACTS[m.client];
+  log("", "");
+  const stepsHtml = m.steps.map((s, i) =>
+    `<div class="step-row ${i === 0 ? 'now' : ''}">
+      <span class="n">${i+1}.</span><span class="c">${escapeHtml(s.cmd)}</span>
+      <span class="d">← ${escapeHtml(s.d)}</span>
+    </div>`).join("");
+  log({ html: `<span class="brief">
+    <b>📋 GÖREV BRİFİNGİ — ${m.id} ${m.special ? "🔥 ÖZEL" : ""}</b><br>
+    <b>Müşteri:</b> <span style="color:${c.color}">${c.emoji} ${c.name}</span> · ${c.type}<br>
+    <b>Hedef:</b> ${m.target} · <b>Şehir:</b> ${c.city}<br>
+    <b>Ödeme:</b> ${money(m.reward)} · <b>İtibar:</b> +${m.rep} · <b>Süre:</b> ${m.time}s<br><br>
+    <b>AÇIKLAMA:</b><br>${escapeHtml(m.desc)}<br><br>
+    <b>ADIMLAR (sırayla yaz):</b>
+    ${stepsHtml}
+    <br><span style="color:#ffff66">'hint' ipucu, 'abort' iptal.</span>
+  </span>` });
+  log("", "");
+  log({ html: `<span class="ok">▶ İlk komut: <b>${escapeHtml(m.steps[0].cmd)}</b></span>` });
+  log("", "");
+}
+function startTimer() {
+  clearInterval(state.timerInterval);
+  const ring = document.getElementById("timerRing");
+  ring.classList.add("on");
+  const updateRing = () => {
+    const pct = state.timerRemaining / state.active.time;
+    const circ = 2 * Math.PI * 11;
+    document.getElementById("ringFg").setAttribute("stroke-dashoffset", circ * (1 - pct));
+    const mm = Math.floor(state.timerRemaining / 60), ss = state.timerRemaining % 60;
+    document.getElementById("timerVal").textContent = `${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`;
+    ring.classList.toggle("warn", pct <= 0.5 && pct > 0.25);
+    ring.classList.toggle("danger", pct <= 0.25);
+  };
+  updateRing();
+  state.timerInterval = setInterval(() => {
+    state.timerRemaining--;
+    if (state.timerRemaining <= 5 && state.timerRemaining > 0) Audio2.tick();
+    if (state.timerRemaining <= 0) { clearInterval(state.timerInterval); timeUp(); return; }
+    updateRing();
+  }, 1000);
+}
+function stopTimer() {
+  clearInterval(state.timerInterval);
+  document.getElementById("timerRing").classList.remove("on", "warn", "danger");
+}
+async function timeUp() {
+  const m = state.active;
+  if (!m) return;
+  log("", ""); log("⏰ SÜRE DOLDU!", "err");
+  log(`  Polis sinyali aldı.`, "err");
+  state.wanted = Math.min(10, state.wanted + 2);
+  state.rep = Math.max(0, state.rep - Math.floor(m.rep / 2));
+  state.streak = 0;
+  m.done = true; m.refused = true; m.timeout = true;
+  state.history.unshift(m);
+  state.active = null;
+  stopTimer();
+  Audio2.alarm();
+  saveState(); updateStats(); renderMissions();
+  addNews("bad", m);
+  if (state.wanted >= 8) setTimeout(triggerCapture, 800);
+}
+function abortMission() {
+  if (!state.active) { log("Aktif görev yok.", "warn"); return; }
+  const m = state.active;
+  m.done = true; m.refused = true;
+  state.history.unshift(m);
+  state.rep = Math.max(0, state.rep - 2);
+  state.streak = 0;
+  log(`${m.id} iptal. İtibar -2`, "warn");
+  state.active = null;
+  stopTimer();
+  Audio2.fail();
+  saveState(); updateStats(); renderMissions();
+}
+async function checkMissionProgress(rawInput) {
+  if (!state.active) return;
+  const m = state.active;
+  const step = m.steps[state.activeStep];
+  if (!step) return;
+  const input = rawInput.trim().toLowerCase();
+  const want = step.cmd.toLowerCase();
+  const matched = input === want || input.startsWith(want);
+  if (matched) {
+    log("", "");
+    log({ html: `<span class="ok">✓ ADIM ${state.activeStep+1}/${m.steps.length} TAMAM</span>` });
+    state.activeStep++;
+    updateStats();
+    Audio2.step();
+    if (state.activeStep >= m.steps.length) await completeMission(m);
+    else {
+      const nx = m.steps[state.activeStep];
+      log({ html: `<span class="hl">▶ Sonraki: <b>${escapeHtml(nx.cmd)}</b></span> <span class="sys">← ${escapeHtml(nx.d)}</span>` });
+    }
+    log("", "");
+    renderMissions();
+  }
+}
+async function completeMission(m) {
+  stopTimer();
+  state.lastMissionTimeLeft = state.timerRemaining;
+  const c = CONTACTS[m.client];
+  const successChance = Math.max(0.55, Math.min(0.98, 0.92 - m.risk * 0.05 + state.rep * 0.003));
+  const success = Math.random() < successChance;
+  log("", "");
+  if (success) {
+    state.money += m.reward;
+    state.rep += m.rep;
+    state.done += 1;
+    state.streak += 1;
+    if (m.client === "komiser_y") state.wanted = Math.max(0, state.wanted - 1);
+    else if (["chaos","hack"].includes(m.type) && m.risk >= 3) state.wanted = Math.min(10, state.wanted + 1);
+    log({ html: `<span class="ok">════ ✓✓✓ GÖREV TAMAMLANDI ✓✓✓ ════</span>` });
+    log(`  + ${money(m.reward)}  ·  +${m.rep} itibar`, "ok");
+    log(`  ${c.emoji} ${c.name}: "${rand(["Temiz iş.","Beklediğimden hızlı.","Ağ seni hatırlayacak.","Sözünü tuttun."])}"`, "info");
+    Audio2.coin();
+    setTimeout(() => Audio2.ok(), 300);
+    toast(`+${money(m.reward)} kazandın!`, "gold");
+    addNews("good", m);
+  } else {
+    state.rep = Math.max(0, state.rep - Math.floor(m.rep / 2));
+    state.wanted = Math.min(10, state.wanted + 1);
+    state.streak = 0;
+    log({ html: `<span class="err">✗ SON ADIMDA YAKALANDIN</span>` });
+    log(`  Aranma +1`, "err");
+    Audio2.fail();
+    addNews("bad", m);
+  }
+  m.done = true;
+  state.history.unshift(m);
+  state.active = null;
+  state.activeStep = 0;
+  saveState(); updateStats(); renderMissions();
+  checkAchievements();
+  if (state.wanted >= 8) setTimeout(triggerCapture, 900);
+}
+function hintMission() {
+  if (!state.active) { log("Aktif görev yok.", "warn"); return; }
+  const step = state.active.steps[state.activeStep];
+  log("", "");
+  log({ html: `<span class="hl">📌 Sıradaki: <b>${escapeHtml(step.cmd)}</b></span>` });
+  log(`   ${escapeHtml(step.d)}`, "info");
+  log("", "");
+  Audio2.beep(1200, 0.08, "sine", 0.15);
+}
+function refuseMission(id) {
+  const m = findMission(id);
+  if (!m) { log(`${id}: görev yok.`, "err"); return; }
+  m.done = true; m.refused = true;
+  state.history.unshift(m);
+  const c = CONTACTS[m.client];
+  log(`${m.id} reddedildi.`, "warn");
+  log(`  ${c.emoji} ${c.name}: "${rand(["Anladım.","Yazık.","Sana yakışmadı.","Kendi bilirsin."])}"`, "sys");
+  state.rep = Math.max(0, state.rep - 1);
+  state.streak = 0;
+  Audio2.fail();
+  saveState(); updateStats(); renderMissions();
+}
+
+/* ============================================================
+   ACHIEVEMENTS
+   ============================================================ */
+function checkAchievements() {
+  ACHIEVEMENTS.forEach(a => {
+    if (state.unlockedAch.has(a.id)) return;
+    if (a.check(state)) {
+      state.unlockedAch.add(a.id);
+      Audio2.ach();
+      toast(`🏆 ${a.name} kazanıldı!`, "gold");
+      log({ html: `<span class="hl">🏆 ROZET: ${a.name} — ${a.desc}</span>` });
+      addNews("good", { type:"ach", title:a.name, desc:a.desc, client:"anonim" });
+    }
+  });
+  renderAch();
+}
+
+/* ============================================================
+   CAPTURE
+   ============================================================ */
+function triggerCapture() {
+  Audio2.alarm();
+  const cap = document.getElementById("capture");
+  document.getElementById("capStats").innerHTML = `
+    <div class="st"><div class="l">TAMAMLANAN</div><div class="v">${state.done}</div></div>
+    <div class="st"><div class="l">İTİBAR</div><div class="v">${state.rep}</div></div>
+    <div class="st"><div class="l">KAZANÇ</div><div class="v">${money(state.money)}</div></div>
+  `;
+  cap.classList.add("on");
+}
+document.getElementById("capReset").onclick = () => {
+  localStorage.removeItem("golge_v2");
+  state.rep = 0; state.money = 0; state.done = 0; state.wanted = 0; state.streak = 0;
+  state.inbox = []; state.history = []; state.unlockedAch = new Set();
+  state.contacts = new Set(["anonim", "serseri_7"]);
+  state.active = null;
+  document.getElementById("capture").classList.remove("on");
+  hackLog.innerHTML = "";
+  updateStats(); renderMissions(); renderAch();
+  bootSequence(true);
+};
+
+/* ============================================================
+   NEWS
+   ============================================================ */
+function addNews(kind, mis) {
+  const templates = {
+    good:[ "Gizemli bir hacker şirket sistemlerinden veri sızdırdı", "Siber saldırı sonrası bir şirket kayıtlarını kaybetti", "Karanlık ağda yeni bir isim konuşuluyor" ],
+    bad:[ "Polis siber suçlar birimi harekete geçti", "Bir şirket veri sızıntısı sonrası dava açtı", "Anonim bir hesap ifşa edildi" ],
+    mission:[ "Yeni bir siber olay rapor edildi", "Karanlık ağda hareketlilik var" ],
+  };
+  const text = rand(templates[kind] || templates.mission);
+  const item = { kind, title: text, desc: mis.title || mis.desc || "", time: Date.now(),
+    source:["SiberHaber","DarkWatch","AnonFeed","TechPost","Gündem24"][randInt(0,4)] };
+  state.news.unshift(item);
+  if (state.news.length > 30) state.news.pop();
+  updateTicker();
+  if (document.getElementById("panelNews").classList.contains("open")) renderNews();
+}
+function updateTicker() {
+  const latest = state.news[0];
+  if (!latest) return;
+  document.getElementById("tickerText").textContent = `${latest.source}: ${latest.title}`;
+}
+function renderNews() {
+  const body = document.getElementById("newsBody");
+  if (!state.news.length) { body.innerHTML = `<div style="text-align:center;color:#6b8fad;padding:40px">Henüz haber yok.</div>`; return; }
+  body.innerHTML = state.news.map(n => {
+    const cls = n.kind === "bad" ? "bad" : n.kind === "good" ? "good" : "";
+    const ago = Math.floor((Date.now() - n.time) / 1000);
+    const agoStr = ago < 60 ? `${ago} sn önce` : `${Math.floor(ago/60)} dk önce`;
+    return `<div class="news-item ${cls}">
+      <div class="cat">${SVG.icon.warn.replace('<svg','<svg style="color:#22d3ee"')} ${n.source}</div>
+      <div class="headline">${escapeHtml(n.title)}</div>
+      ${n.desc ? `<div class="body">${escapeHtml(n.desc)}</div>` : ""}
+      <div class="time">${agoStr}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ============================================================
+   PANELS
+   ============================================================ */
+function openSide(id) {
+  try { Audio2.init(); } catch(e) {}
+  document.getElementById(id).classList.add("open");
+  hackInput.blur();
+}
+function closeSide(id) {
+  document.getElementById(id).classList.remove("open");
+  hackInput.focus();
+}
+document.querySelectorAll("[data-close]").forEach(btn => {
+  btn.addEventListener("click", () => { Audio2.panelClose(); closeSide(btn.dataset.close); });
+});
+document.getElementById("btnMissions").addEventListener("click", () => { Audio2.panel(); renderMissions(); openSide("panelMissions"); });
+document.getElementById("btnAch").addEventListener("click", () => { Audio2.panel(); renderAch(); openSide("panelAch"); });
+document.getElementById("btnNews").addEventListener("click", () => { Audio2.panel(); renderNews(); openSide("panelNews"); });
+document.getElementById("btnDict").addEventListener("click", () => { Audio2.panel(); renderDict(); openSide("panelDict"); });
+document.getElementById("btnSound").addEventListener("click", () => { Audio2.toggle(); });
+
+function renderMissions() {
+  const body = document.getElementById("missionBody");
+  const active = state.inbox.filter(m => !m.done);
+  if (!active.length) {
+    body.innerHTML = `<div style="text-align:center;color:#6b8fad;padding:60px 20px">
+      <div style="font-size:44px;opacity:.6;margin-bottom:14px">📭</div>
+      Gelen kutusu boş. Yeni işler bekleniyor…
+    </div>`;
+    return;
+  }
+  body.innerHTML = active.map(m => {
+    const c = CONTACTS[m.client];
+    const isActive = state.active && state.active.id === m.id;
+    const avatar = SVG.avatar[m.client] || SVG.avatar.anonim;
+    let stepsHtml = "";
+    if (isActive) {
+      stepsHtml = `<div class="mis-steps">${m.steps.map((s, i) => {
+        const cls = i < state.activeStep ? "done" : (i === state.activeStep ? "now" : "");
+        const marker = i < state.activeStep ? "✓" : (i === state.activeStep ? "▶" : "·");
+        return `<div class="sr ${cls}"><span class="sn">${marker}</span><span class="sc">${escapeHtml(s.cmd)}</span></div>`;
+      }).join("")}</div>`;
+    }
+    return `
+      <div class="mis-card ${isActive ? 'active' : ''}" data-id="${m.id}">
+        <div class="mis-top">
+          <div class="mis-avatar">${avatar}
+            <div class="type-dot" style="background:${c.color}">${(SVG.icon[m.type] || SVG.icon.hack).replace('<svg', '<svg style="color:#000"')}</div>
+          </div>
+          <div class="mis-head-info">
+            <div class="mis-cli" style="color:${c.color}">${c.emoji} ${escapeHtml(c.name)}</div>
+            <div class="mis-cli-type">${escapeHtml(c.type)} · ${c.city}</div>
+          </div>
+        </div>
+        <div class="mis-title">${escapeHtml(m.title)}</div>
+        <div class="mis-desc">${escapeHtml(m.desc)}</div>
+        <div class="mis-meta">
+          <span class="tag rew">${SVG.icon.coin} ${money(m.reward)}</span>
+          <span class="tag">📈 +${m.rep}</span>
+          ${m.risk ? `<span class="tag risk">${SVG.icon.warn} ${"★".repeat(m.risk)}</span>` : ""}
+          <span class="tag">${SVG.icon.timer} ${m.time}s</span>
+          <span class="tag">${SVG.icon.check} ${m.steps.length} adım</span>
+          ${m.special ? `<span class="tag special">🔥 ÖZEL</span>` : ""}
+        </div>
+        ${stepsHtml}
+        <div class="mis-actions">
+          ${isActive
+            ? `<button class="abt" data-act="abort" data-id="${m.id}">${SVG.icon.x} İPTAL</button>`
+            : `<button class="acc" data-act="accept" data-id="${m.id}">${SVG.icon.check} KABUL</button>
+               <button class="ref" data-act="refuse" data-id="${m.id}">${SVG.icon.x} REDDET</button>`}
+        </div>
+      </div>`;
+  }).join("");
+  body.querySelectorAll("[data-act]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      Audio2.clickDeep();
+      const id = btn.dataset.id;
+      if (btn.dataset.act === "accept") acceptMission(id, true);
+      else if (btn.dataset.act === "refuse") refuseMission(id);
+      else if (btn.dataset.act === "abort") { closeSide("panelMissions"); abortMission(); }
+    });
+  });
+}
+function renderAch() {
+  const body = document.getElementById("achBody");
+  body.innerHTML = `<div class="sb-title">Kazanılan: ${state.unlockedAch.size} / ${ACHIEVEMENTS.length}</div>
+    <div class="ach-grid">${ACHIEVEMENTS.map(a => {
+    const unlocked = state.unlockedAch.has(a.id);
+    return `<div class="ach-card ${unlocked ? 'unlocked' : 'locked'}">
+      <div class="ach-icon">${SVG.ach[a.id] || SVG.ach.first_hack}</div>
+      <div class="ach-name">${escapeHtml(a.name)}</div>
+      <div class="ach-desc">${escapeHtml(a.desc)}</div>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+/* ============================================================
+   DICT
+   ============================================================ */
+const COMMAND_DOCS = {
+  help:{cat:"kabuk",syntax:"help [kat]",short:"Komut listesi",long:"Tüm komutlar.",ex:"help"},
+  man:{cat:"kabuk",syntax:"man <k>",short:"Kılavuz",long:"Komut kılavuzu.",ex:"man hint"},
+  clear:{cat:"kabuk",syntax:"clear",short:"Temizle",long:"Ekranı temizler.",ex:"clear"},
+  history:{cat:"kabuk",syntax:"history",short:"Geçmiş",long:"Komut geçmişi.",ex:"history"},
+  echo:{cat:"kabuk",syntax:"echo <m>",short:"Yazdır",long:"Metni yazar.",ex:"echo hi"},
+  ls:{cat:"dosya",syntax:"ls [-la] [yol]",short:"Listele",long:"Dizin listeler.",ex:"ls -la"},
+  cd:{cat:"dosya",syntax:"cd [yol]",short:"Dizin değiştir",long:"Dizin değiştirir.",ex:"cd /etc"},
+  pwd:{cat:"dosya",syntax:"pwd",short:"Dizin",long:"Şu anki dizin.",ex:"pwd"},
+  cat:{cat:"dosya",syntax:"cat <f>",short:"Dosya oku",long:"Dosya içeriği.",ex:"cat /etc/passwd"},
+  grep:{cat:"dosya",syntax:"grep <d> <f>",short:"Ara",long:"Desen arar.",ex:"grep anon /etc/passwd"},
+  tree:{cat:"dosya",syntax:"tree",short:"Ağaç",long:"Ağaç görünümü.",ex:"tree"},
+  find:{cat:"dosya",syntax:"find <d>",short:"Bul",long:"Dosya arar.",ex:"find log"},
+  missions:{cat:"görev",syntax:"missions",short:"Görevler",long:"Aktif görevler.",ex:"missions"},
+  accept:{cat:"görev",syntax:"accept <id>",short:"Kabul et",long:"Görevi kabul eder.",ex:"accept M001"},
+  refuse:{cat:"görev",syntax:"refuse <id>",short:"Reddet",long:"Reddeder.",ex:"refuse M002"},
+  hint:{cat:"görev",syntax:"hint",short:"İpucu",long:"Sıradaki adım.",ex:"hint"},
+  abort:{cat:"görev",syntax:"abort",short:"İptal",long:"İptal eder.",ex:"abort"},
+  status:{cat:"görev",syntax:"status",short:"Durum",long:"İstatistikler.",ex:"status"},
+  contacts:{cat:"görev",syntax:"contacts",short:"Kişiler",long:"Kişiler.",ex:"contacts"},
+  history_mis:{cat:"görev",syntax:"history_mis",short:"Geçmiş",long:"Görev geçmişi.",ex:"history_mis"},
+  ach:{cat:"görev",syntax:"ach",short:"Rozetler",long:"Kazanılan rozetler.",ex:"ach"},
+  news:{cat:"görev",syntax:"news",short:"Haberler",long:"Haber akışı.",ex:"news"},
+  spawn:{cat:"görev",syntax:"spawn [kişi]",short:"Zorla görev",long:"Test için zorla görev üretir.",ex:"spawn anonim"},
+  nmap:{cat:"araç",syntax:"nmap <h>",short:"Port tara",long:"Port tarar.",ex:"nmap 10.0.0.1"},
+  ssh:{cat:"araç",syntax:"ssh <h>",short:"Bağlan",long:"SSH bağlantı.",ex:"ssh root@10.0.0.1"},
+  scan:{cat:"araç",syntax:"scan",short:"Ağ tara",long:"Ağı tarar.",ex:"scan"},
+  exploit:{cat:"araç",syntax:"exploit <h>",short:"Exploit",long:"Exploit.",ex:"exploit 10.0.0.1"},
+  backdoor:{cat:"araç",syntax:"backdoor",short:"Arka kapı",long:"Arka kapı.",ex:"backdoor"},
+  clean:{cat:"araç",syntax:"clean",short:"Temizle",long:"İzleri siler.",ex:"clean"},
+  whois:{cat:"araç",syntax:"whois <h>",short:"Bilgi",long:"Hedef bilgisi.",ex:"whois 10.0.0.1"},
+  trace:{cat:"araç",syntax:"trace <h>",short:"İz sür",long:"İz sürer.",ex:"trace 10.0.0.1"},
+  submit:{cat:"araç",syntax:"submit",short:"Gönder",long:"Kanıt gönderir.",ex:"submit"},
+  inject:{cat:"araç",syntax:"inject <h>",short:"Enjekte",long:"Veri enjekte eder.",ex:"inject 10.0.0.1"},
+  overload:{cat:"araç",syntax:"overload <h>",short:"Aşırı yükle",long:"DDoS.",ex:"overload 10.0.0.1"},
+  vanish:{cat:"araç",syntax:"vanish",short:"Kaybol",long:"Kaybolur.",ex:"vanish"},
+  decrypt:{cat:"araç",syntax:"decrypt",short:"Şifre çöz",long:"Şifre çözer.",ex:"decrypt"},
+  crack:{cat:"araç",syntax:"crack <h>",short:"Kır",long:"Hash kırar.",ex:"crack abc"},
+  whoami:{cat:"sistem",syntax:"whoami",short:"Kim",long:"Kullanıcı.",ex:"whoami"},
+  date:{cat:"sistem",syntax:"date",short:"Tarih",long:"Tarih.",ex:"date"},
+  env:{cat:"sistem",syntax:"env",short:"Env",long:"Ortam.",ex:"env"},
+  ping:{cat:"sistem",syntax:"ping <h>",short:"Ping",long:"Ping.",ex:"ping 10.0.0.1"},
+  matrix:{cat:"eğlence",syntax:"matrix [stil]",short:"Matrix",long:"classic,binary,red,purple,hex,rainbow,ancient,off",ex:"matrix rainbow"},
+  chaos:{cat:"eğlence",syntax:"chaos",short:"Kaos",long:"Kaos.",ex:"chaos"},
+  reset:{cat:"eğlence",syntax:"reset",short:"Sıfırla",long:"Sıfırlar.",ex:"reset"},
+};
+const CAT_INFO = { kabuk:{title:"🐚 KABUK"}, dosya:{title:"📁 DOSYA"}, görev:{title:"💼 GÖREV"}, araç:{title:"🔧 ARAÇLAR"}, sistem:{title:"⚙️ SİSTEM"}, eğlence:{title:"🎉 EĞLENCE"} };
+
+function renderDict(filter = "") {
+  const body = document.getElementById("dictBody");
+  const f = filter.trim().toLowerCase();
+  const byCat = {};
+  Object.entries(COMMAND_DOCS).forEach(([name, doc]) => {
+    if (f && !name.toLowerCase().includes(f) && !doc.short.toLowerCase().includes(f)) return;
+    if (!byCat[doc.cat]) byCat[doc.cat] = [];
+    byCat[doc.cat].push([name, doc]);
+  });
+  const total = Object.values(byCat).reduce((a, arr) => a + arr.length, 0);
+  if (!total) { body.innerHTML = `<div style="text-align:center;color:#6b8fad;padding:40px">Sonuç yok</div>`; return; }
+  body.innerHTML = Object.entries(CAT_INFO).map(([catKey, info]) => {
+    const items = byCat[catKey];
+    if (!items || !items.length) return "";
+    return `<div class="sb-title" style="margin-top:14px">${info.title}</div>
+      ${items.map(([name, doc]) => `
+        <div style="background:rgba(10,20,15,.5);border:1px solid rgba(51,255,102,.12);
+                    border-radius:10px;padding:10px 12px;margin-bottom:6px;font-family:'JetBrains Mono',monospace">
+          <div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:4px">
+            <span style="color:#33ff66;font-weight:700;font-size:13px">${name}</span>
+            <span style="color:#6b8fad;font-size:11px">${doc.short}</span>
+          </div>
+          <div style="color:#33ccff;font-size:11.5px;background:rgba(0,0,0,.3);padding:3px 7px;
+                      border-radius:5px;display:inline-block">${doc.syntax}</div>
+          <div style="color:#9fc0a8;font-size:11.5px;margin-top:6px;line-height:1.5">${doc.long}</div>
+          <div style="color:#ffff66;font-size:11.5px;margin-top:6px;padding-left:10px;
+                      border-left:2px solid rgba(255,255,102,.4)">› ${doc.ex}</div>
+        </div>`).join("")}`;
+  }).join("");
+}
+document.getElementById("dictSearch").addEventListener("input", (e) => renderDict(e.target.value));
+
+/* ============================================================
+   COMMANDS
+   ============================================================ */
+const commands = {
+  help: (args) => {
+    const g = {
+      "kabuk":["help","man","clear","history","echo"],
+      "dosya":["ls","cd","pwd","cat","grep","tree","find"],
+      "görev":["missions","accept","refuse","hint","abort","status","contacts","history_mis","ach","news","spawn"],
+      "araç":["nmap","ssh","scan","exploit","backdoor","clean","whois","trace","submit","inject","overload","vanish","decrypt","crack"],
+      "sistem":["whoami","date","env","ping"],
+      "eğlence":["matrix","chaos","reset"],
+    };
+    if (args[0] && g[args[0]]) {
+      log(`── ${args[0].toUpperCase()} ──`, "info");
+      g[args[0]].forEach(c => log("  " + c + "  —  " + (COMMAND_DOCS[c]?.short || "?")));
+      return;
+    }
+    log("Kategoriler:", "info");
+    Object.keys(g).forEach(k => log(`  help ${k}`, "hl"));
+  },
+  man: (args) => {
+    if (!args[0]) return "Kullanım: man <komut>";
+    const d = COMMAND_DOCS[args[0]];
+    if (!d) return `man: '${args[0]}' yok`;
+    return [d.syntax, "", d.long, "", "Örnek: " + d.ex];
+  },
+  clear: () => "__CLEAR__",
+  history: () => history.length ? history.map((h, i) => `  ${String(i+1).padStart(3)}  ${h}`) : "(boş)",
+  echo: (args) => args.join(" "),
+  reset: () => {
+    log("Sıfırlamak için 'reset confirm' yaz.", "warn");
+    window._resetPending = true;
+    window._resetTimer = setTimeout(() => { window._resetPending = false; }, 5000);
+  },
+  missions: () => {
+    const active = state.inbox.filter(m => !m.done);
+    if (!active.length) return ["Gelen kutusu boş."];
+    const out = [`${active.length} aktif görev:`, ""];
+    active.forEach(m => {
+      const c = CONTACTS[m.client];
+      const isA = state.active && state.active.id === m.id;
+      out.push({ html: `  ${isA?"▶":" "} <span class="hl">${m.id}</span> <span style="color:${c.color};font-weight:700">${c.emoji} ${escapeHtml(c.name)}</span> — ${escapeHtml(m.title)}` });
+    });
+    out.push("");
+    out.push("accept <id> · refuse <id> · hint · abort");
+    return out;
+  },
+  accept: (args) => { if (!args[0]) return "Kullanım: accept <id>"; acceptMission(args[0], false); },
+  refuse: (args) => { if (!args[0]) return "Kullanım: refuse <id>"; refuseMission(args[0]); },
+  hint: () => hintMission(),
+  abort: () => abortMission(),
+  spawn: (args) => {
+    const client = args[0];
+    const m = makeMission(client || null);
+    if (!m) return "Görev üretilemedi";
+    state.inbox.unshift(m);
+    notifyMission(m);
+    renderMissions(); updateStats();
+    return `✅ ${m.id} zorla üretildi`;
+  },
+  status: () => {
+    const out = ["═══════════════════════════",
+      `  İTİBAR:      ${state.rep}`,
+      `  PARA:        ${money(state.money)}`,
+      `  ARANMA:      ${state.wanted}★`,
+      `  TAMAMLANAN:  ${state.done}`,
+      `  SERİ:        ${state.streak}`,
+      `  ROZET:       ${state.unlockedAch.size}/${ACHIEVEMENTS.length}`,
+      `  TANIDIK:     ${state.contacts.size}`];
+    if (state.active) {
+      out.push("───────────────────────────");
+      out.push(`  AKTİF: ${state.active.id} — ${state.active.title}`);
+      out.push(`  İLERLEME: ${state.activeStep}/${state.active.steps.length}`);
+      out.push(`  SIRADAKİ: ${state.active.steps[state.activeStep]?.cmd || "—"}`);
+      out.push(`  KALAN: ${state.timerRemaining}s`);
+    }
+    out.push("═══════════════════════════");
+    return out;
+  },
+  contacts: () => {
+    const list = [...state.contacts];
+    const out = [`${list.length} kişi:`, ""];
+    list.forEach(k => {
+      const c = CONTACTS[k];
+      out.push({ html: `  <span style="color:${c.color};font-weight:700">${c.emoji} ${escapeHtml(c.name)}</span> <span class="sys">(${escapeHtml(c.type)} · ${c.city})</span>` });
+    });
+    return out;
+  },
+  history_mis: () => {
+    if (!state.history.length) return "Henüz görev yok.";
+    return state.history.slice(0, 15).map(m => {
+      const c = CONTACTS[m.client];
+      const st = m.timeout ? "SÜRE DOLDU" : (m.refused ? "RED" : "TAMAM");
+      return `  ${m.id}  ${c.emoji} ${c.name}  —  ${m.title}  [${st}]`;
+    });
+  },
+  ach: () => {
+    const out = [`${state.unlockedAch.size}/${ACHIEVEMENTS.length} rozet:`, ""];
+    ACHIEVEMENTS.forEach(a => {
+      const u = state.unlockedAch.has(a.id);
+      out.push({ html: `  ${u ? "🏆" : "🔒"} <b style="color:${u?"#c4b5fd":"#6b8fad"}">${escapeHtml(a.name)}</b> — <span class="sys">${escapeHtml(a.desc)}</span>` });
+    });
+    return out;
+  },
+  news: () => {
+    if (!state.news.length) return "Haber yok.";
+    return state.news.slice(0, 10).map(n => `  [${n.source}] ${n.title}`);
+  },
+  pwd: () => cwd,
+  cd: (args) => {
+    const p = args[0] || "/root";
+    const abs = resolvePath(p);
+    const n = getNode(abs);
+    if (!n) return `cd: ${p}: No such file`;
+    if (n.type !== "dir") return `cd: ${p}: Not a directory`;
+    cwd = abs === "" ? "/" : abs;
+    updatePrompt();
+  },
+  ls: (args) => {
+    const flags = args.filter(a => a.startsWith("-")).join("");
+    const p = args.find(a => !a.startsWith("-")) || ".";
+    const n = getNode(resolvePath(p));
+    if (!n) return `ls: ${p}: No such file`;
+    if (n.type === "file") return p;
+    let e = Object.keys(n.children).sort();
+    if (!flags.includes("a")) e = e.filter(x => !x.startsWith("."));
+    if (!e.length) return "";
+    if (flags.includes("l")) return e.map(x => {
+      const c = n.children[x], d = c.type === "dir";
+      return `${d?"drwxr-xr-x":"-rw-r--r--"} 1 root root ${String(d?4096:(c.content||"").length).padStart(6)} Şub 14 03:22 ${x}${d?"/":""}`;
+    });
+    return { html: e.map(x => n.children[x].type === "dir"
+      ? `<span class="dir">${escapeHtml(x)}/</span>` : escapeHtml(x)).join("  ") };
+  },
+  cat: (args) => {
+    if (!args[0]) return "Kullanım: cat <dosya>";
+    const n = getNode(resolvePath(args[0]));
+    if (!n) return `cat: ${args[0]}: No such file`;
+    if (n.type === "dir") return `cat: ${args[0]}: Is a directory`;
+    return (n.content || "").split("\n");
+  },
+  grep: (args) => {
+    if (args.length < 2) return "Kullanım: grep <desen> <dosya>";
+    const n = getNode(resolvePath(args[1]));
+    if (!n || n.type !== "file") return `grep: ${args[1]}: No such file`;
+    const re = new RegExp(escapeHtml(args[0]), "i");
+    const l = (n.content || "").split("\n").filter(x => re.test(x));
+    if (!l.length) return "";
+    return l.map(x => ({ html: escapeHtml(x).replace(new RegExp(escapeHtml(args[0]), "gi"), m => `<span class="hl">${m}</span>`) }));
+  },
+  tree: (args) => {
+    const root = getNode(resolvePath(args[0] || "."));
+    if (!root) return "Yol bulunamadı";
+    const out = [args[0] || "."];
+    function walk(n, p) {
+      const k = Object.keys(n.children).sort();
+      k.forEach((x, i) => {
+        const last = i === k.length - 1;
+        const c = n.children[x];
+        out.push(p + (last ? "└── " : "├── ") + x + (c.type === "dir" ? "/" : ""));
+        if (c.type === "dir") walk(c, p + (last ? "    " : "│   "));
+      });
+    }
+    walk(root, "");
+    return out;
+  },
+  find: (args) => {
+    const q = args[0] || "";
+    if (!q) return "Kullanım: find <desen>";
+    const out = [];
+    function walk(n, p) {
+      for (const x of Object.keys(n.children)) {
+        const c = n.children[x];
+        const full = p + "/" + x;
+        if (x.includes(q)) out.push(full);
+        if (c.type === "dir") walk(c, full);
+      }
+    }
+    walk(FS, "");
+    return out.length ? out : "(yok)";
+  },
+  nmap: async (args) => {
+    const t = args[0] || "127.0.0.1";
+    log(`Starting Nmap 7.94`, "info");
+    await sleep(400);
+    log(`Nmap scan report for ${t}`); await sleep(300);
+    log(`Host is up (0.00${randInt(10,40)}s latency).`); log("");
+    log("PORT     STATE  SERVICE");
+    const ports = [22,80,443,3306,8080,4444].sort((a,b)=>a-b);
+    for (const p of ports.filter(() => Math.random() > 0.4)) {
+      await sleep(120);
+      log(`${String(p).padEnd(8)} open   ${({22:"ssh",80:"http",443:"https",3306:"mysql",8080:"http-proxy",4444:"krb524"})[p]}`, "warn");
+    }
+    log(""); log(`Nmap done: 1 IP address (1 host up)`);
+  },
+  ssh: async (args) => {
+    const h = args[0] || "localhost";
+    log(`Connecting to ${h}...`, "sys"); await sleep(600);
+    log(`Warning: Permanently added '${h}' to known hosts.`, "warn"); await sleep(400);
+    log(`Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0 x86_64)`, "ok");
+  },
+  scan: async () => {
+    log("Ağ taranıyor...", "info");
+    for (let i = 0; i < 8; i++) {
+      await sleep(140);
+      const ip = `10.0.${randInt(0,3)}.${randInt(1,250)}`;
+      const port = [22,80,443,3306,8080,4444][randInt(0,5)];
+      const open = Math.random() > 0.55;
+      log(`  ${ip}:${port} ....... ${open ? "AÇIK" : "kapalı"}`, open ? "warn" : "sys");
+    }
+    log(""); log(`Tarama tamamlandı.`, "ok");
+  },
+  exploit: async (args) => {
+    const t = args[0] || "hedef";
+    log(`Exploit hazırlanıyor: CVE-2024-XXXX`, "info");
+    for (const s of ["Payload hazırlanıyor...","Yük gönderiliyor...","Bağlantı kuruluyor..."]) { log("  → " + s, "warn"); await sleep(300); }
+    log(`✓ Exploit başarılı: ${t}`, "ok");
+  },
+  backdoor: async () => {
+    log("Arka kapı kuruluyor...", "warn");
+    for (const s of ["Port 4444 dinleniyor...","Servis kaydediliyor...","Kalıcılık sağlanıyor..."]) { log("  ✓ " + s, "sys"); await sleep(250); }
+    log("✓ Arka kapı aktif.", "ok");
+  },
+  clean: async () => {
+    log("İzler siliniyor...", "info");
+    for (const s of ["Bash history temizleniyor...","Auth loglar siliniyor...","SSH kayıtları siliniyor...","Proxy zinciri kapatılıyor..."]) { log("  ✓ " + s, "sys"); await sleep(220); }
+    log("✓ İzler silindi.", "ok");
+  },
+  whois: (args) => {
+    const t = args[0] || "hedef";
+    return [`Hedef: ${t}`,"Kayıt: 2019-03-14","Güncelleme: 2024-08-22","Sunucu: [GİZLİ]","Konum: Amsterdam, NL"];
+  },
+  trace: async (args) => {
+    const t = args[0] || "hedef";
+    log(`İz sürülüyor: ${t}`, "info");
+    for (let i = 1; i <= 5; i++) { await sleep(240); log(`  ${i}  10.0.0.${randInt(1,255)}   ${randInt(5,50)} ms`, "sys"); }
+    log(`  hedef: 203.0.113.${randInt(1,255)}   ${randInt(50,200)} ms`, "ok");
+    log("✓ Konum: İstanbul, TR", "ok");
+  },
+  submit: async () => {
+    log("Kanıt paketi hazırlanıyor...", "info"); await sleep(400);
+    log("Şifreli kanaldan gönderiliyor...", "sys"); await sleep(400);
+    log("✓ Polise teslim edildi.", "ok");
+  },
+  inject: async (args) => {
+    log("Veri enjeksiyonu başlatılıyor...", "warn");
+    for (const s of ["Bağlantı sağlandı...","Tablo kilitlendi...","Yeni kayıtlar yazılıyor...","Commit yapıldı..."]) { log("  → " + s, "sys"); await sleep(250); }
+    log("✓ Enjeksiyon tamamlandı.", "ok");
+  },
+  overload: async (args) => {
+    const t = args[0] || "hedef";
+    log(`${t} sunucusuna yük bindiriliyor...`, "warn");
+    for (let i = 0; i <= 100; i += 20) { await sleep(180); log(`  Yük: [${"█".repeat(i/20)}${"░".repeat(5-i/20)}] ${i}%`, "info"); }
+    log("✓ Sistem yanıt vermiyor.", "ok");
+  },
+  vanish: async () => {
+    log("Kaybolma protokolü...", "warn");
+    for (const s of ["Tor devreleri kapatılıyor...","VPN zinciri temizleniyor...","MAC adresi değiştiriliyor...","Terminal sessizleştiriliyor..."]) { log("  ✓ " + s, "sys"); await sleep(250); }
+    log("✓ İz yok. Kayboldun.", "ok");
+  },
+  decrypt: async () => {
+    log("AES-256 çözülüyor...", "info");
+    const hex = "0123456789abcdef";
+    let s = "";
+    for (let i = 0; i < 60; i++) { s += hex[Math.random()*16|0]; if (i%2) s += " "; }
+    const line = document.createElement("div");
+    line.className = "l info";
+    hackLog.appendChild(line);
+    for (let i = 0; i < s.length; i++) { line.textContent = s.slice(0, i); hackLog.scrollTop = hackLog.scrollHeight; await sleep(12); }
+    await sleep(250);
+    return "✓ Çözüldü: 'gl0b4l@ccess'";
+  },
+  crack: async (args) => {
+    const h = args[0] || "hash";
+    log(`Hash kırılıyor: ${h}`, "info");
+    for (const w of ["123456","password","admin","root","qwerty","letmein"]) {
+      await sleep(180);
+      log(`  Deniyor: ${w}`, "sys");
+      if (Math.random() < 0.35) { log(`✓ Şifre: ${w}`, "ok"); return; }
+    }
+    log("✗ Bulunamadı.", "err");
+  },
+  whoami: () => "root",
+  date: () => new Date().toString(),
+  env: () => ["USER=root","HOME=/root","SHELL=/bin/bash","PROXY=socks5://127.0.0.1:9050","ANON=1","ALIAS=GÖLGE"],
+  ping: async (args) => {
+    const h = args[0] || "localhost";
+    const ip = `10.0.${randInt(0,255)}.${randInt(0,255)}`;
+    log(`PING ${h} (${ip}) 56(84) bytes of data.`);
+    for (let i = 0; i < 4; i++) { await sleep(400); log(`64 bytes from ${ip}: icmp_seq=${i+1} ttl=64 time=${(10+Math.random()*40).toFixed(1)} ms`, "sys"); }
+    await sleep(250); log(""); log("4 packets transmitted, 4 received, 0% packet loss");
+  },
+  matrix: (args) => {
+    const s = args[0] || "";
+    if (s === "off") { document.getElementById("matrix").style.display = "none"; return "Matrix kapalı."; }
+    if (!s) {
+      const k = Object.keys(MATRIX_STYLES);
+      matrixStyle = k[(k.indexOf(matrixStyle) + 1) % k.length];
+      document.getElementById("matrix").style.display = "block";
+      startMatrix();
+      return `Matrix: ${matrixStyle}`;
+    }
+    if (!MATRIX_STYLES[s]) return `Bilinmeyen. Seçenekler: ${Object.keys(MATRIX_STYLES).join(", ")}, off`;
+    matrixStyle = s;
+    document.getElementById("matrix").style.display = "block";
+    startMatrix();
+    return `Matrix: ${s}`;
+  },
+  chaos: async () => {
+    log("KAOS MODU AKTİF", "err");
+    const events = ["Rastgele sunucu çöktü.","Anonim mesaj: 'Seni izliyoruz.'","Gazete: 'Gizemli veri sızıntısı!'","Banka sistemi yavaşladı.","Sosyal medya hesabı hacklendi.","Şirket hisseleri %3 düştü.","Polis siber birimi harekete geçti."];
+    for (let i = 0; i < 6; i++) { await sleep(400); log("  ⚡ " + rand(events), Math.random() > 0.5 ? "warn" : "info"); }
+    state.wanted = Math.min(10, state.wanted + 1);
+    saveState(); updateStats();
+    log(""); log("Kaos bitti. Aranma +1", "err");
+    addNews("bad", { title:"Şehirde kaos", desc:"Birden fazla servis çöktü" });
+    if (state.wanted >= 8) setTimeout(triggerCapture, 800);
+  },
+};
+
+/* ============================================================
+   EXECUTOR
+   ============================================================ */
+async function runCommand(input) {
+  const parts = input.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+  const cmdName = parts[0];
+  const args = parts.slice(1).map(a => a.replace(/^"|"$/g, ""));
+  log({ html: `<span class="prompt">root@mainframe:${cwd === "/root" ? "~" : cwd}$</span> ${escapeHtml(input)}` }, "sys");
+  if (window._resetPending && input.trim() === "reset confirm") {
+    state.rep=0; state.money=0; state.done=0; state.wanted=0; state.streak=0;
+    state.inbox=[]; state.history=[]; state.unlockedAch=new Set();
+    state.contacts=new Set(["anonim", "serseri_7"]);
+    state.active=null; state.activeStep=0;
+    stopTimer();
+    saveState(); updateStats();
+    clearTimeout(window._resetTimer); window._resetPending=false;
+    log("Sıfırlandı.", "ok");
+    return;
+  }
+  const fn = commands[cmdName];
+  if (!fn) { log(`${cmdName}: command not found. 'help' yaz.`, "err"); Audio2.fail(); return; }
+  try {
+    const result = await fn(args);
+    if (result === "__CLEAR__") { hackLog.innerHTML = ""; return; }
+    if (result == null) {}
+    else if (typeof result === "string") log(result);
+    else if (Array.isArray(result)) result.forEach(l => log(l));
+    else if (typeof result === "object") log(result);
+  } catch (e) { log(`${cmdName}: ${e.message}`, "err"); }
+  await checkMissionProgress(input);
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+function toast(text, kind = "") {
+  const el = document.createElement("div");
+  el.className = "toast-item " + kind;
+  const iconSvg = kind === "gold" ? SVG.icon.star : kind === "danger" ? SVG.icon.warn : SVG.icon.check;
+  el.innerHTML = `${iconSvg}<span>${escapeHtml(text)}</span>`;
+  document.getElementById("toast").appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 400); }, 3000);
+}
+
+/* ============================================================
+   AUTOCOMPLETE
+   ============================================================ */
+const acBox = document.getElementById("autocomplete");
+let acSelected = 0, acMatches = [];
+function updateAutocomplete() {
+  const val = hackInput.value;
+  const words = val.split(/\s+/);
+  if (words.length > 1 || !val) { acBox.classList.remove("on"); return; }
+  acMatches = Object.keys(commands).filter(c => c.startsWith(val)).slice(0, 8);
+  if (!acMatches.length || (acMatches.length === 1 && acMatches[0] === val)) { acBox.classList.remove("on"); return; }
+  acSelected = 0;
+  acBox.innerHTML = acMatches.map((m, i) =>
+    `<div class="item ${i === acSelected ? 'sel' : ''}" data-cmd="${m}">
+      <span class="nm">${m}</span>
+      <span class="ds">${COMMAND_DOCS[m]?.short || ""}</span>
+    </div>`).join("");
+  acBox.classList.add("on");
+  acBox.querySelectorAll(".item").forEach(el => {
+    el.addEventListener("click", () => { hackInput.value = el.dataset.cmd + " "; acBox.classList.remove("on"); hackInput.focus(); });
+  });
+}
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+hackInput.addEventListener("input", updateAutocomplete);
+hackInput.addEventListener("keydown", async (e) => {
+  if (e.key === "Tab" && acBox.classList.contains("on")) {
+    e.preventDefault();
+    hackInput.value = acMatches[acSelected] + " ";
+    acBox.classList.remove("on"); return;
+  }
+  if (e.key === "ArrowDown" && acBox.classList.contains("on")) {
+    e.preventDefault();
+    acSelected = Math.min(acMatches.length - 1, acSelected + 1);
+    acBox.querySelectorAll(".item").forEach((el, i) => el.classList.toggle("sel", i === acSelected));
+    return;
+  }
+  if (e.key === "ArrowUp" && acBox.classList.contains("on")) {
+    e.preventDefault();
+    acSelected = Math.max(0, acSelected - 1);
+    acBox.querySelectorAll(".item").forEach((el, i) => el.classList.toggle("sel", i === acSelected));
+    return;
+  }
+  if (e.key === "Enter") {
+    acBox.classList.remove("on");
+    const raw = hackInput.value.trim();
+    hackInput.value = "";
+    if (!raw) return;
+    history.push(raw);
+    histIdx = history.length;
+    Audio2.enter();
+    await runCommand(raw);
+    return;
+  }
+  if (e.key === "ArrowUp" && !acBox.classList.contains("on")) { e.preventDefault(); if (histIdx > 0) histIdx--; hackInput.value = history[histIdx] || ""; return; }
+  if (e.key === "ArrowDown" && !acBox.classList.contains("on")) { e.preventDefault(); if (histIdx < history.length - 1) histIdx++; else histIdx = history.length; hackInput.value = history[histIdx] || ""; return; }
+});
+hackInput.addEventListener("keypress", () => Audio2.key());
+document.addEventListener("click", (e) => {
+  if (!document.querySelector(".side.open")) hackInput.focus();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") document.querySelectorAll(".side.open").forEach(s => s.classList.remove("open"));
+  if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.key === "K" || e.key === "k") { e.preventDefault(); renderDict(); openSide("panelDict"); Audio2.panel(); }
+    if (e.key === "J" || e.key === "j") { e.preventDefault(); renderMissions(); openSide("panelMissions"); Audio2.panel(); }
+    if (e.key === "N" || e.key === "n") { e.preventDefault(); renderNews(); openSide("panelNews"); Audio2.panel(); }
+    if (e.key === "A" || e.key === "a") { e.preventDefault(); renderAch(); openSide("panelAch"); Audio2.panel(); }
+    if (e.key === "S" || e.key === "s") { e.preventDefault(); Audio2.toggle(); }
+    if (e.key === "M" || e.key === "m") { e.preventDefault(); try { Audio2.init(); } catch(e){} Audio2.mission(); }
+  }
+});
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+async function bootSequence(isReset = false) {
+  if (state.booted && !isReset) return;
+  state.booted = true;
+  const seq = [
+    ["[ SYS ] GÖLGE AĞI v2 başlatılıyor...", "sys", 14],
+    ["[ OK ] Anonim kimlik doğrulandı.", "", 8],
+    ["[ OK ] Tor zinciri aktif (3 atlama).", "", 8],
+    ["[ OK ] Şifreli tünel hazır.", "", 8],
+    ["[ OK ] Ses motoru hazır.", "", 8],
+    ["[ OK ] Terminal hazır.", "ok", 8],
+    ["", "", 0],
+    ["Hoş geldin, GÖLGE.", "hl", 12],
+    ["Görevleri SANA veriyoruz — sen yapıyorsun.", "info", 8],
+    ["Adımları sırayla yaz. Yanlış komut sayılmaz.", "info", 8],
+    ["", "", 0],
+    ["Komutlar: 📖 SÖZLÜK (Shift+K)", "hl", 8],
+    ["Görevler: 💼 GÖREVLER (Shift+J)", "hl", 8],
+    ["Haberler: 📰 HABERLER (Shift+N)", "hl", 8],
+    ["Rozetler: 🏆 ROZETLER (Shift+A) · Ses: Shift+S", "hl", 8],
+    ["", "", 0],
+  ];
+  for (const [t, c, sp] of seq) {
+    if (!t) { log(""); continue; }
+    await logTyped(t, c, sp);
+  }
+  updateStats();
+  await sleep(400);
+  if (!state.inbox.filter(m => !m.done).length) {
+    for (let i = 0; i < 3; i++) {
+      const m = makeMission();
+      if (m) { state.inbox.push(m); notifyMission(m); }
+      await sleep(400);
+    }
+  }
+  renderMissions();
+  renderAch();
+  if (!state.news.length) {
+    addNews("mission", { title:"Karanlık ağda hareketlilik", desc:"Anonim gruplar aktive oldu" });
+    addNews("mission", { title:"Polis siber birimi alarma geçti", desc:"Yeni saldırılar bekleniyor" });
+  }
+  scheduleSpawn(randInt(25000, 35000));
+}
+
+/* ============================================================
+   BAŞLATMA
+   ============================================================ */
+renderDict();
+renderAch();
+updatePrompt();
+
+const initAudioOnce = () => { try { Audio2.init(); Audio2.boot(); } catch(e) { console.warn("audio:", e); } };
+document.addEventListener("click", initAudioOnce, { once: true });
+document.addEventListener("keydown", initAudioOnce, { once: true });
+document.addEventListener("touchstart", initAudioOnce, { once: true });
+
+setTimeout(() => {
+  try { bootSequence(); } catch(e) { console.error("boot:", e); }
+  setTimeout(() => {
+    if (!state.inbox.filter(m => !m.done).length) {
+      for (let i = 0; i < 3; i++) {
+        const m = makeMission();
+        if (m) { state.inbox.push(m); notifyMission(m); }
+      }
+      renderMissions(); updateStats();
+    }
+  }, 3000);
+}, 200);
+
+setTimeout(() => hackInput.focus(), 600);
+</script>
+</body>
+</html>
